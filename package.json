@@ -1,0 +1,25 @@
+{
+  "name": "danh-gia-khoa-phong",
+  "version": "1.0.0",
+  "description": "Hệ thống đánh giá hoạt động khoa phòng - Bệnh viện Đa khoa Thủ Đức",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && echo 'Deploy to Cloudflare Pages via GitHub'"
+  },
+  "keywords": ["evaluation", "hospital", "dashboard", "vietnam"],
+  "author": "Phòng Tổ chức Cán bộ - BV Đa khoa Thủ Đức",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.8"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "lucide-react": "^0.294.0"
+  }
+}

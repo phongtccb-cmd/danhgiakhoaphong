@@ -1,0 +1,23 @@
+name = "danh-gia-khoa-phong"
+type = "javascript"
+account_id = ""
+workers_dev = true
+route = ""
+zone_id = ""
+
+[env.production]
+name = "danh-gia-khoa-phong-prod"
+routes = [
+  { pattern = "danhgiakhoaphong.pages.dev", zone_name = "pages.dev" }
+]
+
+[build]
+command = "npm run build"
+cwd = "./"
+watch_paths = ["src/**/*.jsx", "src/**/*.css"]
+
+[build.upload]
+format = "service-worker"
+
+[triggers.crons]
+crons = []
