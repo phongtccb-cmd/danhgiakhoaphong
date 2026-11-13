@@ -42,7 +42,7 @@ export default function ComparisonPlans() {
                 <ul>
                   <li>Phụ thuộc vào email từ 5 BV (có thể chậm)</li>
                   <li>Dữ liệu có thể không đầy đủ hoặc không chính xác</li>
-                  <li>Nếu <3 BV trả lời → phải chuyển sang PLAN B</li>
+                  <li>Nếu &lt;3 BV trả lời → phải chuyển sang PLAN B</li>
                 </ul>
               </div>
               <div className="plan-section">
@@ -89,7 +89,7 @@ export default function ComparisonPlans() {
               </div>
               <div className="plan-section">
                 <h4>📊 Trigger</h4>
-                <p><strong><3 BV trả lời FORM_02</strong> → Dùng PLAN B (hoặc chọn chủ động)</p>
+                <p><strong>&lt;3 BV trả lời FORM_02</strong> → Dùng PLAN B (hoặc chọn chủ động)</p>
               </div>
             </div>
           </div>
@@ -157,7 +157,7 @@ export default function ComparisonPlans() {
           </div>
           <div className="timeline-info">
             <p>✅ ≥3 BV → PLAN A (Benchmarking)</p>
-            <p>❌ <3 BV → PLAN B (WHO Standards)</p>
+            <p>❌ &lt;3 BV → PLAN B (WHO Standards)</p>
           </div>
         </div>
       </div>
