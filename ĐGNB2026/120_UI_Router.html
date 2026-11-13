@@ -1,0 +1,445 @@
+<!-- 120_UI_Router.html: client-side behavior for 200_Index.html. -->
+<script>
+    function navigateInsideFrame(url, replace) {
+      if (!url) return;
+      if (replace) {
+        window.location.replace(url);
+      } else {
+        window.location.assign(url);
+      }
+    }
+
+    function getLoginUrlFallback() {
+      return window.location.href.split('#')[0].split('?')[0];
+    }
+
+    function buildLoginUrl(baseUrl) {
+      return String(baseUrl || getLoginUrlFallback()).split('#')[0].split('?')[0];
+    }
+
+    window.appScriptUrl = getLoginUrlFallback();
+    const APP_BOOT_TIMEOUT_MS = 15000;
+    const APP_VIEW_STORAGE_KEY = 'last_view_id';
+
+    // BIẾN TOÀN CỤC BẢO MẬT
+    let currentUser = null; 
+    let currentConfig = { khoa: '', phong: '' }; 
+    let bootTimer = null;
+
+    function setBootState(title, text) {
+      const boot = document.getElementById('app-boot');
+      if (!boot) return;
+      boot.classList.remove('hidden');
+      const titleEl = document.getElementById('app-boot-title');
+      const textEl = document.getElementById('app-boot-text');
+      if (titleEl && title) titleEl.textContent = title;
+      if (textEl && text) textEl.textContent = text;
+    }
+
+    function hideBoot() {
+      if (bootTimer) {
+        window.clearTimeout(bootTimer);
+        bootTimer = null;
+      }
+      document.getElementById('app-boot')?.classList.add('hidden');
+    }
+
+    function showLoginShell() {
+      hideBoot();
+      document.getElementById('app-root')?.classList.add('hidden');
+      document.getElementById('login-shell')?.classList.remove('hidden');
+      if (typeof resetLoginForm === 'function') resetLoginForm({ focus: false });
+      window.setTimeout(() => document.getElementById('login-username')?.focus(), 30);
+    }
+
+    function hideLoginShell() {
+      document.getElementById('login-shell')?.classList.add('hidden');
+    }
+
+    function startBootWatchdog() {
+      if (bootTimer) window.clearTimeout(bootTimer);
+      bootTimer = window.setTimeout(() => {
+        showBootError('K\u1ebft n\u1ed1i x\u00e1c minh phi\u00ean ph\u1ea3n h\u1ed3i qu\u00e1 l\u00e2u. Vui l\u00f2ng t\u1ea3i l\u1ea1i ho\u1eb7c \u0111\u0103ng nh\u1eadp l\u1ea1i.');
+      }, APP_BOOT_TIMEOUT_MS);
+    }
+
+    function getSessionToken() {
+      return currentUser && currentUser.sessionToken ? currentUser.sessionToken : '';
+    }
+
+    function getCurrentUserRoles() {
+      if (!currentUser) return [];
+      const roles = Array.isArray(currentUser.roles) ? currentUser.roles : [];
+      if (roles.length > 0) return roles;
+      return currentUser.role ? [currentUser.role] : [];
+    }
+
+    function currentUserHasRole(role) {
+      return getCurrentUserRoles().includes(role);
+    }
+
+    function canViewDashboard() {
+      return currentUserHasRole('TruongNhom') || currentUserHasRole('ThuKi');
+    }
+
+    function canViewAdmin() {
+      return currentUserHasRole('Admin');
+    }
+
+    function isLab2429DepartmentName(value) {
+      const text = String(value || '').toLowerCase();
+      return text.includes('sinh h') || text.includes('huy') || text.includes('vi sinh') || text.includes('gi\u1ea3i ph') || text.includes('giai ph') || text.includes('xn_') || text === 'all';
+    }
+
+    function canViewLab2429() {
+      if (currentUserHasRole('Admin') || currentUserHasRole('DoanXN') || currentUserHasRole('TruongNhom') || currentUserHasRole('ThuKi')) return true;
+      if (!currentUserHasRole('Khoa')) return false;
+      const accessList = Array.isArray(currentUser && currentUser.quyenTruyCap) ? currentUser.quyenTruyCap : [];
+      return accessList.some(isLab2429DepartmentName);
+    }
+
+    function canViewBiosafety() {
+      return canViewLab2429();
+    }
+
+    function canViewEvidence() {
+      return currentUserHasRole('Admin') || currentUserHasRole('Khoa') || currentUserHasRole('TruongNhom') || currentUserHasRole('ThuKi');
+    }
+    function getRoleLabel(role) {
+      if (role === 'Admin') return 'Qu\u1ea3n tr\u1ecb h\u1ec7 th\u1ed1ng';
+      if (role === 'TruongNhom') return 'Tr\u01b0\u1edfng nh\u00f3m';
+      if (role === 'ThuKi') return 'Th\u01b0 k\u00ed';
+      if (role === 'DoanKT') return '\u0110o\u00e0n KTBV ch\u1ea5m';
+      if (role === 'DoanXN') return '\u0110o\u00e0n x\u00e9t nghi\u1ec7m 2429';
+      return '\u0110\u01a1n v\u1ecb ch\u1ea5m';
+    }
+
+    function getInitialViewId() {
+      if (canViewAdmin()) return 'view-admin';
+      if (canViewDashboard()) return 'view-dashboard';
+      if (canViewLab2429()) return 'view-lab2429';
+      if (canViewBiosafety()) return 'view-biosafety';
+      if (canViewEvidence()) return 'view-evidence';
+      return 'view-checklist';
+    }
+
+    function canOpenView(viewId) {
+      if (viewId === 'view-dashboard') return canViewDashboard();
+      if (viewId === 'view-lab2429') return canViewLab2429();
+      if (viewId === 'view-biosafety') return canViewBiosafety();
+      if (viewId === 'view-evidence') return canViewEvidence();
+      if (viewId === 'view-admin') return canViewAdmin();
+      return ['view-checklist', 'view-result', 'view-account'].includes(viewId);
+    }
+
+    function getPreferredViewId() {
+      const savedViewId = localStorage.getItem(APP_VIEW_STORAGE_KEY);
+      if (savedViewId && canOpenView(savedViewId)) return savedViewId;
+      return getInitialViewId();
+    }
+
+    function redirectToLogin(replace) {
+      setBootState('\u0110ang quay l\u1ea1i \u0111\u0103ng nh\u1eadp', 'Phi\u00ean l\u00e0m vi\u1ec7c \u0111ang \u0111\u01b0\u1ee3c \u0111\u00f3ng an to\u00e0n.');
+      showLoginShell();
+    }
+
+    function clearSessionAndRedirect(replace) {
+      sessionStorage.removeItem('authenticated_user');
+      localStorage.removeItem('authenticated_user');
+      localStorage.removeItem(APP_VIEW_STORAGE_KEY);
+      currentUser = null;
+      showLoginShell();
+    }
+
+    function showBootError(message) {
+      hideBoot();
+      Swal.fire({
+        title: 'Ch\u01b0a kh\u00f4i ph\u1ee5c \u0111\u01b0\u1ee3c phi\u00ean',
+        text: message || 'K\u1ebft n\u1ed1i Apps Script \u0111ang gi\u00e1n \u0111o\u1ea1n. Vui l\u00f2ng th\u1eed t\u1ea3i l\u1ea1i trang.',
+        icon: 'warning',
+        confirmButtonColor: '#2f7d57',
+        confirmButtonText: 'T\u1ea3i l\u1ea1i',
+        showCancelButton: true,
+        cancelButtonText: '\u0110\u0103ng nh\u1eadp l\u1ea1i',
+        customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold', cancelButton: 'rounded-xl font-bold' }
+      }).then(result => {
+        if (result.isConfirmed) {
+          window.location.reload();
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+          clearSessionAndRedirect(true);
+        }
+      });
+    }
+
+    function handleApiAuthError(res) {
+      if (!res || !res.authRequired) return false;
+      Swal.fire({
+        title: 'Phi\u00ean \u0111\u0103ng nh\u1eadp \u0111\u00e3 h\u1ebft h\u1ea1n',
+        text: res.message || 'Vui l\u00f2ng \u0111\u0103ng nh\u1eadp l\u1ea1i \u0111\u1ec3 ti\u1ebfp t\u1ee5c.',
+        icon: 'warning',
+        confirmButtonColor: '#2f7d57',
+        allowOutsideClick: false,
+        customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold' }
+      }).then(() => clearSessionAndRedirect(true));
+      return true;
+    }
+
+    function bootAuthenticatedApp(user) {
+      currentUser = user;
+      sessionStorage.setItem('authenticated_user', JSON.stringify(user));
+      localStorage.removeItem('authenticated_user');
+      hideLoginShell();
+
+      document.getElementById('sidebar-username').innerText = currentUser.name;
+      document.getElementById('sidebar-role').innerText = getRoleLabel(currentUser.role);
+      document.getElementById('nav-btn-dashboard')?.classList.toggle('hidden', !canViewDashboard());
+      document.getElementById('nav-btn-lab2429')?.classList.toggle('hidden', !canViewLab2429());
+      document.getElementById('nav-btn-biosafety')?.classList.toggle('hidden', !canViewBiosafety());
+      document.getElementById('nav-btn-evidence')?.classList.toggle('hidden', !canViewEvidence());
+      document.getElementById('nav-btn-admin')?.classList.toggle('hidden', !canViewAdmin());
+
+      const isSidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+      const sideNav = document.getElementById('side-nav');
+      const toggleBtnIcon = document.querySelector('#sidebar-toggle span');
+      if (isSidebarCollapsed && sideNav) {
+        sideNav.classList.add('sidebar-collapsed');
+        if (toggleBtnIcon) {
+          toggleBtnIcon.innerText = 'chevron_right';
+        }
+      }
+
+      document.getElementById('app-root').classList.remove('hidden');
+      hideBoot();
+
+      window.alert = function(msg) {
+        Swal.fire({ title: 'Th\u00f4ng b\u00e1o', text: msg, icon: String(msg).toLowerCase().includes('l\u1ed7i') ? 'error' : 'success', confirmButtonColor: '#2f7d57', customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold' }});
+      };
+
+      switchView(getPreferredViewId());
+    }
+
+    // KIỂM SOÁT VÒNG ĐỜI KHI TRANG TẢI
+    function legacyLocalBootDisabled_() {
+      // 1. Đọc Session từ LocalStorage
+      const savedUser = sessionStorage.getItem('authenticated_user') || localStorage.getItem('authenticated_user');
+      
+      if (!savedUser) {
+        // Neu chua co phien dang nhap thi mo form login trong cung shell /exec.
+        showLoginShell();
+        return;
+      }
+      
+      // 2. Cấp quyền vào App
+      currentUser = JSON.parse(savedUser);
+      
+      // 3. Render thông tin
+      document.getElementById('sidebar-username').innerText = currentUser.name;
+      document.getElementById('sidebar-role').innerText = currentUser.role === 'DoanKT' ? '\u0110o\u00e0n KTBV ch\u1ea5m' : '\u0110\u01a1n v\u1ecb ch\u1ea5m';
+      
+      // 4. Khôi phục trạng thái thu/phóng của Sidebar từ bộ nhớ tạm
+      const isSidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+      const sideNav = document.getElementById('side-nav');
+      const toggleBtnIcon = document.querySelector('#sidebar-toggle span');
+      if (isSidebarCollapsed && sideNav) {
+        sideNav.classList.add('sidebar-collapsed');
+        if (toggleBtnIcon) {
+          toggleBtnIcon.innerText = 'chevron_right';
+        }
+      }
+      
+      document.getElementById('app-root').classList.remove('hidden'); // Mở khóa UI
+      
+      // Ghi đè Custom Alert
+      window.alert = function(msg) {
+        Swal.fire({ title: 'Th\u00f4ng b\u00e1o', text: msg, icon: String(msg).toLowerCase().includes('l\u1ed7i') ? 'error' : 'success', confirmButtonColor: '#2f7d57', customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold' }});
+      };
+      
+      // Khởi tạo trang đầu tiên
+      switchView('view-checklist'); 
+    }
+
+    // LOGIC THU / PHÓNG SIDEBAR (CHỈ ÁP DỤNG TRÊN DESKTOP)
+    window.onload = function() {
+      setBootState('\u0110ang kh\u00f4i ph\u1ee5c phi\u00ean', 'H\u1ec7 th\u1ed1ng \u0111ang x\u00e1c minh t\u00e0i kho\u1ea3n v\u00e0 chu\u1ea9n b\u1ecb kh\u00f4ng gian l\u00e0m vi\u1ec7c.');
+      startBootWatchdog();
+      const savedUser = sessionStorage.getItem('authenticated_user') || localStorage.getItem('authenticated_user');
+      if (!savedUser) {
+        showLoginShell();
+        return;
+      }
+
+      let parsedUser = null;
+      try {
+        parsedUser = JSON.parse(savedUser);
+      } catch (e) {
+        clearSessionAndRedirect(true);
+        return;
+      }
+
+      if (!parsedUser || !parsedUser.sessionToken) {
+        clearSessionAndRedirect(true);
+        return;
+      }
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            if (handleApiAuthError(res)) return;
+            if (res && res.success && res.data) {
+              bootAuthenticatedApp(res.data);
+            } else {
+              showBootError(res && res.message ? res.message : 'Kh\u00f4ng x\u00e1c minh \u0111\u01b0\u1ee3c phi\u00ean \u0111\u0103ng nh\u1eadp.');
+            }
+          })
+          .withFailureHandler(err => showBootError(err && err.message ? err.message : 'Kh\u00f4ng k\u1ebft n\u1ed1i \u0111\u01b0\u1ee3c Apps Script.'))
+          .getCurrentSessionUser(parsedUser.sessionToken);
+      } else {
+        showBootError('Trang n\u00e0y c\u1ea7n ch\u1ea1y trong Google Apps Script. Vui l\u00f2ng m\u1edf l\u1ea1i webapp \u0111\u00e3 deploy.');
+      }
+    }
+
+    function toggleSidebar() {
+      const sideNav = document.getElementById('side-nav');
+      const toggleBtnIcon = document.querySelector('#sidebar-toggle span');
+      
+      // Toggle class co giãn
+      const isCollapsed = sideNav.classList.toggle('sidebar-collapsed');
+      
+      // Lưu trạng thái vào localStorage
+      localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false');
+      
+      // Quay mũi tên điều hướng
+      if (toggleBtnIcon) {
+        toggleBtnIcon.innerText = isCollapsed ? 'chevron_right' : 'chevron_left';
+      }
+    }
+
+    // LOGIC CHUYỂN TAB
+    function switchView(viewId) {
+      if (viewId === 'view-list') viewId = 'view-result';
+
+      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+      const target = document.getElementById(viewId);
+      if (target) target.classList.add('active');
+
+      document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.classList.remove('active-nav');
+        btn.removeAttribute('aria-current');
+      });
+      const activateNavButton = (buttonId) => {
+        const button = document.getElementById(buttonId);
+        if (!button) return;
+        button.classList.add('active-nav');
+        button.setAttribute('aria-current', 'page');
+      };
+      
+      if (viewId === 'view-setup') {
+        switchView('view-checklist');
+        return;
+      } else if (viewId === 'view-dashboard') {
+        if (!canViewDashboard()) {
+          switchView(getInitialViewId());
+          return;
+        }
+        activateNavButton('nav-btn-dashboard');
+      } else if (viewId === 'view-checklist') {
+        activateNavButton('nav-btn-checklist');
+      } else if (viewId === 'view-evidence') {
+        if (!canViewEvidence()) {
+          switchView(getInitialViewId());
+          return;
+        }
+        activateNavButton('nav-btn-evidence');
+      } else if (viewId === 'view-result') {
+        activateNavButton('nav-btn-result');
+      } else if (viewId === 'view-lab2429') {
+        if (!canViewLab2429()) {
+          switchView(getInitialViewId());
+          return;
+        }
+        activateNavButton('nav-btn-lab2429');
+      } else if (viewId === 'view-biosafety') {
+        if (!canViewBiosafety()) {
+          switchView(getInitialViewId());
+          return;
+        }
+        activateNavButton('nav-btn-biosafety');
+      } else if (viewId === 'view-account') {
+        activateNavButton('nav-btn-account');
+      } else if (viewId === 'view-admin') {
+        if (!canViewAdmin()) {
+          switchView(getInitialViewId());
+          return;
+        }
+        activateNavButton('nav-btn-admin');
+      }
+
+      window.App.views.activate(viewId);
+      
+      if (canOpenView(viewId)) {
+        localStorage.setItem(APP_VIEW_STORAGE_KEY, viewId);
+      }
+      document.getElementById('main-scroll-area').scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ĐĂNG XUẤT
+    function logoutApp() {
+      Swal.fire({
+        title: '\u0110\u0103ng xu\u1ea5t?',
+        text: 'B\u1ea1n s\u1ebd c\u1ea7n nh\u1eadp l\u1ea1i m\u1eadt kh\u1ea9u \u0111\u1ec3 truy c\u1eadp v\u00e0o l\u1ea7n sau.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#b94a48',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: '\u0110\u0103ng xu\u1ea5t an to\u00e0n',
+        customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold', cancelButton: 'rounded-xl font-bold' }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          const token = getSessionToken();
+          let redirected = false;
+          const finishLogout = () => {
+            if (redirected) return;
+            redirected = true;
+            sessionStorage.removeItem('authenticated_user');
+            localStorage.removeItem('authenticated_user');
+            localStorage.removeItem(APP_VIEW_STORAGE_KEY);
+            currentUser = null;
+            showLoginShell();
+          };
+
+          setBootState('\u0110ang \u0111\u0103ng xu\u1ea5t', 'H\u1ec7 th\u1ed1ng \u0111ang \u0111\u00f3ng phi\u00ean v\u00e0 chuy\u1ec3n v\u1ec1 m\u00e0n h\u00ecnh \u0111\u0103ng nh\u1eadp.');
+          window.setTimeout(finishLogout, 600);
+          if (typeof google !== 'undefined' && token) {
+            google.script.run
+              .withSuccessHandler(finishLogout)
+              .withFailureHandler(finishLogout)
+              .logoutUser(token);
+          } else {
+            finishLogout();
+          }
+        }
+      });
+    }
+
+    window.App.auth = Object.assign(window.App.auth || {}, {
+      getSessionToken,
+      getCurrentUserRoles,
+      hasRole: currentUserHasRole,
+      logout: logoutApp
+    });
+
+    window.App.router = Object.assign(window.App.router || {}, {
+      open: switchView,
+      canOpen: canOpenView,
+      getInitialViewId
+    });
+
+    window.App.views.register('view-dashboard', { activate: initDashboardUI, refresh: loadDashboardOverview });
+    window.App.views.register('view-checklist', { activate: initCheckListUI, refresh: loadChecklistData });
+    window.App.views.register('view-evidence', { activate: initEvidenceUI, refresh: loadEvidenceData });
+    window.App.views.register('view-result', { activate: initResultUI, refresh: loadKetQuaKhoa });
+    window.App.views.register('view-lab2429', { activate: initLab2429UI, refresh: loadLab2429Checklist });
+    window.App.views.register('view-biosafety', { activate: initBiosafetyUI, refresh: loadBiosafetyChecklist });
+    window.App.views.register('view-account', { activate: initAccountUI });
+    window.App.views.register('view-admin', { activate: initAdminUI, refresh: loadAdminConfig });
+  </script>

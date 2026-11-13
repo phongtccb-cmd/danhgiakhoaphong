@@ -1,0 +1,313 @@
+<!-- 211_Controller_Login.html: client-side behavior for 210_LoginView.html. -->
+<script>
+    const LOGIN_TIMEOUT_MS = 20000;
+    let loginBusy = false;
+    let originalLoginButtonHTML = '';
+    let pendingLoginToken = '';
+
+    function navigateInsideFrame(url) {
+      if (!url) return;
+      window.location.assign(url);
+    }
+
+    function getCurrentExecBaseUrl() {
+      return window.location.href.split('#')[0].split('?')[0];
+    }
+
+    function buildMainUrl() {
+      return getCurrentExecBaseUrl();
+    }
+
+    function getRoleLabel(role) {
+      if (role === 'Admin') return 'Qu\u1ea3n tr\u1ecb h\u1ec7 th\u1ed1ng';
+      if (role === 'TruongNhom') return 'Tr\u01b0\u1edfng nh\u00f3m';
+      if (role === 'ThuKi') return 'Th\u01b0 k\u00ed';
+      if (role === 'DoanKT') return '\u0110o\u00e0n KTBV ch\u1ea5m';
+      if (role === 'DoanXN') return '\u0110o\u00e0n x\u00e9t nghi\u1ec7m 2429';
+      return '\u0110\u01a1n v\u1ecb ch\u1ea5m';
+    }
+
+    function getRoleDescription(role) {
+      if (role === 'Admin') return 'Qu\u1ea3n tr\u1ecb c\u1ea5u h\u00ecnh h\u1ec7 th\u1ed1ng';
+      if (role === 'TruongNhom') return 'Theo d\u00f5i dashboard t\u1ed5ng quan c\u1ee7a nh\u00f3m';
+      if (role === 'ThuKi') return 'Theo d\u00f5i dashboard v\u00e0 t\u1ed5ng h\u1ee3p ti\u1ebfn \u0111\u1ed9';
+      if (role === 'DoanKT') return 'Ch\u1ea5m \u0111i\u1ec3m v\u1edbi quy\u1ec1n \u0111o\u00e0n KTBV';
+      if (role === 'DoanXN') return 'Ch\u1ea5m b\u1ea3ng ki\u1ec3m ch\u1ea5t l\u01b0\u1ee3ng ph\u00f2ng x\u00e9t nghi\u1ec7m';
+      return 'T\u1ef1 ch\u1ea5m theo \u0111\u01a1n v\u1ecb ho\u1eb7c khoa';
+    }
+
+    function getLoginButton() {
+      return document.getElementById('btn-login');
+    }
+
+    function setLoginStatus(message, state) {
+      const status = document.getElementById('login-status');
+      if (!status) return;
+      status.textContent = message || '';
+      status.dataset.state = state || '';
+    }
+
+    function setLoginBusy(isBusy, label) {
+      const btn = getLoginButton();
+      loginBusy = !!isBusy;
+      if (!btn) return;
+      if (!originalLoginButtonHTML) originalLoginButtonHTML = btn.innerHTML;
+      btn.disabled = !!isBusy;
+      btn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+      btn.innerHTML = isBusy
+        ? '<span class="material-symbols-outlined animate-spin text-[22px]">sync</span> ' + (label || '\u0110ang x\u00e1c th\u1ef1c')
+        : originalLoginButtonHTML;
+    }
+
+    function setFieldError(inputId, message) {
+      const input = document.getElementById(inputId);
+      const error = document.getElementById(inputId + '-error');
+      if (!input || !error) return;
+      input.setAttribute('aria-invalid', message ? 'true' : 'false');
+      error.textContent = message || '';
+    }
+
+    function clearLoginErrors() {
+      setFieldError('login-username', '');
+      setFieldError('login-password', '');
+      setLoginStatus('', '');
+    }
+
+    function showLoginError(message) {
+      setLoginBusy(false);
+      setLoginStatus(message || 'Kh\u00f4ng th\u1ec3 \u0111\u0103ng nh\u1eadp. Vui l\u00f2ng th\u1eed l\u1ea1i.', 'error');
+    }
+
+    function hideRoleSelection() {
+      pendingLoginToken = '';
+      const panel = document.getElementById('role-selection-panel');
+      const actions = document.getElementById('role-selection-actions');
+      if (panel) panel.classList.add('hidden');
+      if (actions) actions.innerHTML = '';
+    }
+
+    function resetLoginForm(options) {
+      const opts = options || {};
+      hideRoleSelection();
+      setLoginBusy(false);
+      setLoginStatus('', '');
+      setFieldError('login-username', '');
+      setFieldError('login-password', '');
+      const passwordInput = document.getElementById('login-password');
+      const usernameInput = document.getElementById('login-username');
+      if (passwordInput) {
+        passwordInput.value = '';
+        passwordInput.type = 'password';
+      }
+      const toggleButton = document.getElementById('password-toggle-btn');
+      const toggleIcon = toggleButton ? toggleButton.querySelector('.material-symbols-outlined') : null;
+      if (toggleButton) {
+        toggleButton.setAttribute('aria-pressed', 'false');
+        toggleButton.setAttribute('aria-label', 'Hi\u1ec7n m\u1eadt kh\u1ea9u');
+      }
+      if (toggleIcon) toggleIcon.innerText = 'visibility';
+      if (opts.clearUsername && usernameInput) usernameInput.value = '';
+      if (opts.focus !== false) (usernameInput || passwordInput)?.focus();
+    }
+
+    function togglePasswordVisibility() {
+      const input = document.getElementById('login-password');
+      const button = document.getElementById('password-toggle-btn');
+      const icon = button ? button.querySelector('.material-symbols-outlined') : null;
+      if (!input || !button || !icon) return;
+      const shouldShow = input.type === 'password';
+      input.type = shouldShow ? 'text' : 'password';
+      button.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+      button.setAttribute('aria-label', shouldShow ? '\u1ea8n m\u1eadt kh\u1ea9u' : 'Hi\u1ec7n m\u1eadt kh\u1ea9u');
+      icon.innerText = shouldShow ? 'visibility_off' : 'visibility';
+      input.focus();
+    }
+
+    function enterMainApp(userData) {
+      if (!userData || !userData.sessionToken) {
+        showLoginError('Server \u0111\u00e3 x\u00e1c th\u1ef1c nh\u01b0ng ch\u01b0a tr\u1ea3 v\u1ec1 phi\u00ean \u0111\u0103ng nh\u1eadp. Vui l\u00f2ng th\u1eed l\u1ea1i.');
+        return;
+      }
+      sessionStorage.setItem('authenticated_user', JSON.stringify(userData));
+      localStorage.removeItem('authenticated_user');
+      hideRoleSelection();
+      setLoginBusy(true, '\u0110ang v\u00e0o h\u1ec7 th\u1ed1ng');
+      setLoginStatus('\u0110\u0103ng nh\u1eadp th\u00e0nh c\u00f4ng. \u0110ang m\u1edf kh\u00f4ng gian l\u00e0m vi\u1ec7c...', 'success');
+      window.setTimeout(() => {
+        if (typeof bootAuthenticatedApp === 'function') {
+          document.getElementById('login-shell')?.classList.add('hidden');
+          bootAuthenticatedApp(userData);
+          return;
+        }
+        navigateInsideFrame(buildMainUrl());
+      }, 80);
+    }
+
+    function runWithTimeout(serverCall, onTimeout) {
+      let done = false;
+      const timer = window.setTimeout(() => {
+        if (done) return;
+        done = true;
+        onTimeout();
+      }, LOGIN_TIMEOUT_MS);
+
+      return {
+        success(handler) {
+          return value => {
+            if (done) return;
+            done = true;
+            window.clearTimeout(timer);
+            handler(value);
+          };
+        },
+        failure(handler) {
+          return err => {
+            if (done) return;
+            done = true;
+            window.clearTimeout(timer);
+            handler(err);
+          };
+        },
+        call() {
+          serverCall(this.success.bind(this), this.failure.bind(this));
+        }
+      };
+    }
+
+    function renderRoleSelection(loginData) {
+      const roles = Array.isArray(loginData && loginData.selectableRoles) && loginData.selectableRoles.length > 0
+        ? loginData.selectableRoles
+        : (Array.isArray(loginData && loginData.roles) ? loginData.roles : []);
+      const panel = document.getElementById('role-selection-panel');
+      const actions = document.getElementById('role-selection-actions');
+      if (!panel || !actions || !loginData || !loginData.pendingLoginToken || roles.length === 0) {
+        showLoginError('Kh\u00f4ng nh\u1eadn \u0111\u01b0\u1ee3c danh s\u00e1ch vai tr\u00f2. Vui l\u00f2ng \u0111\u0103ng nh\u1eadp l\u1ea1i.');
+        return;
+      }
+
+      pendingLoginToken = loginData.pendingLoginToken;
+      actions.innerHTML = '';
+      roles.forEach(role => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'role-choice-btn';
+        button.dataset.role = role;
+
+        const title = document.createElement('div');
+        title.className = 'role-choice-title';
+        title.textContent = getRoleLabel(role);
+        button.appendChild(title);
+
+        const desc = document.createElement('div');
+        desc.className = 'role-choice-desc';
+        desc.textContent = getRoleDescription(role);
+        button.appendChild(desc);
+
+        button.addEventListener('click', () => selectLoginRoleFromPanel(role));
+        actions.appendChild(button);
+      });
+
+      panel.classList.remove('hidden');
+      setLoginBusy(false);
+      setLoginStatus('T\u00e0i kho\u1ea3n c\u00f3 nhi\u1ec1u vai tr\u00f2. Ch\u1ecdn m\u1ed9t vai tr\u00f2 \u0111\u1ec3 ti\u1ebfp t\u1ee5c.', '');
+    }
+
+    function setRoleButtonsBusy(isBusy) {
+      document.querySelectorAll('.role-choice-btn, #role-selection-cancel').forEach(button => {
+        button.disabled = !!isBusy;
+        button.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+      });
+    }
+
+    function selectLoginRoleFromPanel(role) {
+      if (!pendingLoginToken || loginBusy) return;
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        showLoginError('Kh\u00f4ng k\u1ebft n\u1ed1i \u0111\u01b0\u1ee3c Apps Script. Vui l\u00f2ng m\u1edf l\u1ea1i webapp \u0111\u00e3 deploy.');
+        return;
+      }
+
+      setLoginBusy(true, '\u0110ang ch\u1ecdn vai tr\u00f2');
+      setRoleButtonsBusy(true);
+      setLoginStatus('\u0110ang m\u1edf phi\u00ean l\u00e0m vi\u1ec7c...', '');
+
+      const request = runWithTimeout((success, failure) => {
+        google.script.run
+          .withSuccessHandler(success(res => {
+            if (res && res.success && res.data) {
+              enterMainApp(res.data);
+            } else {
+              setRoleButtonsBusy(false);
+              showLoginError(res && res.message ? res.message : 'Kh\u00f4ng ch\u1ecdn \u0111\u01b0\u1ee3c vai tr\u00f2. Vui l\u00f2ng \u0111\u0103ng nh\u1eadp l\u1ea1i.');
+            }
+          }))
+          .withFailureHandler(failure(err => {
+            setRoleButtonsBusy(false);
+            showLoginError(err && err.message ? err.message : 'Kh\u00f4ng th\u1ec3 ch\u1ecdn vai tr\u00f2.');
+          }))
+          .selectLoginRole(pendingLoginToken, role);
+      }, () => {
+        setRoleButtonsBusy(false);
+        showLoginError('K\u1ebft n\u1ed1i ch\u1ecdn vai tr\u00f2 ph\u1ea3n h\u1ed3i qu\u00e1 l\u00e2u. Vui l\u00f2ng th\u1eed l\u1ea1i.');
+      });
+      request.call();
+    }
+
+    function handleLogin() {
+      if (loginBusy) return;
+      const userInput = document.getElementById('login-username');
+      const passInput = document.getElementById('login-password');
+      const user = userInput ? userInput.value.trim() : '';
+      const pass = passInput ? passInput.value.trim() : '';
+
+      clearLoginErrors();
+      hideRoleSelection();
+      if (!user || !pass) {
+        if (!user) setFieldError('login-username', 'Vui l\u00f2ng nh\u1eadp t\u00e0i kho\u1ea3n.');
+        if (!pass) setFieldError('login-password', 'Vui l\u00f2ng nh\u1eadp m\u1eadt kh\u1ea9u.');
+        document.getElementById(!user ? 'login-username' : 'login-password')?.focus();
+        return;
+      }
+
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        showLoginError('Kh\u00f4ng k\u1ebft n\u1ed1i Apps Script. Vui l\u00f2ng m\u1edf trang t\u1eeb webapp \u0111\u00e3 deploy.');
+        return;
+      }
+
+      setLoginBusy(true, '\u0110ang x\u00e1c th\u1ef1c');
+      setLoginStatus('\u0110ang ki\u1ec3m tra t\u00e0i kho\u1ea3n...', '');
+
+      const request = runWithTimeout((success, failure) => {
+        google.script.run
+          .withSuccessHandler(success(res => {
+            if (res && res.success) {
+              if (res.roleSelectionRequired) {
+                renderRoleSelection(res.data);
+                return;
+              }
+              enterMainApp(res.data);
+            } else {
+              showLoginError(res && res.message ? res.message : '\u0110\u0103ng nh\u1eadp th\u1ea5t b\u1ea1i.');
+            }
+          }))
+          .withFailureHandler(failure(err => {
+            showLoginError(err && err.message ? err.message : 'Kh\u00f4ng th\u1ec3 k\u1ebft n\u1ed1i t\u1edbi Apps Script.');
+          }))
+          .loginUser(user, pass);
+      }, () => showLoginError('K\u1ebft n\u1ed1i \u0111\u0103ng nh\u1eadp ph\u1ea3n h\u1ed3i qu\u00e1 l\u00e2u. Vui l\u00f2ng th\u1eed l\u1ea1i.'));
+      request.call();
+    }
+
+    function initLoginView() {
+      const btn = getLoginButton();
+      if (btn) originalLoginButtonHTML = btn.innerHTML;
+      document.getElementById('login-username')?.addEventListener('input', () => setFieldError('login-username', ''));
+      document.getElementById('login-password')?.addEventListener('input', () => setFieldError('login-password', ''));
+      document.getElementById('role-selection-cancel')?.addEventListener('click', resetLoginForm);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initLoginView);
+    } else {
+      initLoginView();
+    }
+  </script>

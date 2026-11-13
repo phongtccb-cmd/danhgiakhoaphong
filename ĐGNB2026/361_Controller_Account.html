@@ -1,0 +1,74 @@
+<!-- 361_Controller_Account.html: client-side behavior for 360_AccountView.html. -->
+<script>
+    function getAccountRoleLabel(role) {
+      if (role === 'Admin') return 'Quản trị hệ thống';
+      if (role === 'TruongNhom') return 'Trưởng nhóm';
+      if (role === 'ThuKi') return 'Thư kí';
+      if (role === 'DoanKT') return 'Đoàn KTBV chấm';
+      if (role === 'DoanXN') return 'Đoàn xét nghiệm 2429';
+      return 'Đơn vị chấm';
+    }
+
+    function initAccountUI() {
+      const user = currentUser || {};
+      document.getElementById('account-name').innerText = user.name || '--';
+      document.getElementById('account-username').innerText = user.username ? 'Username: ' + user.username : '--';
+      document.getElementById('account-role').innerText = getAccountRoleLabel(user.role);
+
+      const khoas = Array.isArray(user.quyenTruyCap) ? user.quyenTruyCap : [];
+      document.getElementById('account-scope').innerText = khoas.length ? khoas.join(', ') : '--';
+
+      const expiresAt = Number(user.sessionExpiresAt || 0);
+      document.getElementById('account-session').innerText = expiresAt ? ('Hết hạn: ' + new Date(expiresAt).toLocaleString('vi-VN')) : 'Đang hoạt động';
+
+      ['account-current-password', 'account-new-password', 'account-confirm-password'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    }
+
+    function submitAccountPasswordChange() {
+      const currentPassword = document.getElementById('account-current-password').value;
+      const newPassword = document.getElementById('account-new-password').value;
+      const confirmPassword = document.getElementById('account-confirm-password').value;
+      const btn = document.getElementById('btn-account-change-password');
+      const originalHTML = btn.innerHTML;
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        Swal.fire({ title: 'Thiếu thông tin', text: 'Vui lòng nhập đủ 3 ô mật khẩu.', icon: 'warning', confirmButtonColor: '#16a34a' });
+        return;
+      }
+      if (newPassword.length < 8) {
+        Swal.fire({ title: 'Mật khẩu quá ngắn', text: 'Mật khẩu mới cần tối thiểu 8 ký tự.', icon: 'warning', confirmButtonColor: '#16a34a' });
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        Swal.fire({ title: 'Chưa khớp', text: 'Mật khẩu mới và xác nhận mật khẩu chưa giống nhau.', icon: 'warning', confirmButtonColor: '#16a34a' });
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> Đang cập nhật...';
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (res && res.success) {
+              ['account-current-password', 'account-new-password', 'account-confirm-password'].forEach(id => document.getElementById(id).value = '');
+              Swal.fire({ title: 'Thành công', text: res.message, icon: 'success', confirmButtonColor: '#16a34a' });
+            } else {
+              Swal.fire({ title: 'Không đổi được mật khẩu', text: res && res.message ? res.message : 'Vui lòng thử lại.', icon: 'error', confirmButtonColor: '#ef4444' });
+            }
+          })
+          .withFailureHandler(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            Swal.fire({ title: 'Lỗi kết nối', text: err && err.message ? err.message : 'Không thể đổi mật khẩu.', icon: 'error', confirmButtonColor: '#ef4444' });
+          })
+          .changeMyPassword(getSessionToken(), currentPassword, newPassword);
+      }
+    }
+  </script>

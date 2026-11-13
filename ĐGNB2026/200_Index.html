@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>&#272;&#225;nh gi&#225; 83 Ti&#234;u ch&#237;</title>
+  
+  <meta name="theme-color" content="#f6f7f4">
+  <meta name="description" content="H&#7879; th&#7889;ng ch&#7845;m &#273;i&#7875;m v&#224; theo d&#245;i b&#7843;ng ki&#7875;m ch&#7845;t l&#432;&#7907;ng b&#7879;nh vi&#7879;n.">
+  <?!= include('102_Fonts'); ?>
+  <?!= include('100_Tailwind'); ?>
+  <?!= include('101_SweetAlert'); ?>
+
+  <style>
+    :root {
+      --app-bg: #f6f7f4;
+      --app-surface: rgba(255, 255, 255, 0.88);
+      --app-surface-strong: #ffffff;
+      --app-line: #dfe7df;
+      --app-text: #18231d;
+      --app-muted: #66756b;
+      --app-accent: #2f7d57;
+      --app-accent-strong: #236845;
+      --app-accent-soft: #e7f3eb;
+      --app-danger: #b94a48;
+      --app-shadow: 0 18px 50px rgba(47, 76, 55, 0.10);
+      --app-shadow-soft: 0 8px 28px rgba(47, 76, 55, 0.08);
+      --app-radius: 18px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background:
+        radial-gradient(circle at 8% 8%, rgba(47, 125, 87, 0.10), transparent 28rem),
+        radial-gradient(circle at 92% 0%, rgba(123, 100, 60, 0.08), transparent 24rem),
+        var(--app-bg);
+      color: var(--app-text);
+      font-family: 'Comfortaa', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+      margin: 0;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-variant-numeric: tabular-nums;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.28;
+      background-image:
+        linear-gradient(rgba(24, 35, 29, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(24, 35, 29, 0.025) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: linear-gradient(to bottom, black, transparent 78%);
+    }
+    input, textarea, select {
+      -webkit-user-select: auto;
+      user-select: auto;
+      font-family: 'Comfortaa', system-ui, sans-serif !important;
+    }
+    button, input, textarea, select { letter-spacing: 0; }
+    button, .nav-item { transition: transform 220ms ease, background-color 220ms ease, color 220ms ease, border-color 220ms ease, box-shadow 220ms ease; }
+    button:active, .nav-item:active { transform: translateY(1px) scale(0.99); }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .nav-item:focus-visible {
+      outline: 3px solid rgba(47, 125, 87, 0.22);
+      outline-offset: 2px;
+    }
+
+    .app-wrapper { display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; background: transparent; position: relative; z-index: 1; }
+    @media (min-width: 768px) { .app-wrapper { flex-direction: row; } }
+
+    .nav-container { flex-shrink: 0; background: var(--app-surface); backdrop-filter: blur(18px); z-index: 50; transition: all 0.3s ease; }
+
+    @media (max-width: 767px) {
+      .nav-container {
+        position: fixed;
+        left: max(12px, env(safe-area-inset-left));
+        right: max(12px, env(safe-area-inset-right));
+        bottom: max(12px, env(safe-area-inset-bottom));
+        width: auto;
+        max-width: 430px;
+        margin-left: auto;
+        margin-right: auto;
+        height: 70px;
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 5px;
+        padding: 7px;
+        border: 1px solid rgba(255, 255, 255, 0.78);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 18px 46px rgba(47, 76, 55, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(22px) saturate(1.15);
+        -webkit-backdrop-filter: blur(22px) saturate(1.15);
+        overflow: hidden;
+      }
+      .nav-container::before {
+        content: "";
+        position: absolute;
+        inset: 1px;
+        border-radius: 24px;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0));
+      }
+      .nav-container::-webkit-scrollbar { display: none; }
+      .nav-text {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 9.5px !important;
+        line-height: 1.15;
+        font-weight: 650;
+      }
+      .nav-item {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 56px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        border-radius: 18px;
+        color: #66756b;
+        z-index: 1;
+      }
+      .nav-item .material-symbols-outlined {
+        font-size: 23px !important;
+        margin-right: 0 !important;
+        transform: translateY(0);
+      }
+      .nav-item:hover {
+        background-color: rgba(47, 125, 87, 0.07);
+        border-color: transparent;
+      }
+      .nav-item.active-nav {
+        color: var(--app-accent-strong) !important;
+        background: linear-gradient(180deg, rgba(231, 243, 235, 0.98), rgba(247, 251, 248, 0.94));
+        border-color: rgba(47, 125, 87, 0.14);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 9px 22px rgba(47, 125, 87, 0.12);
+      }
+      .nav-item.active-nav .material-symbols-outlined { transform: translateY(-1px); }
+      #nav-btn-logout {
+        flex: 0 0 48px;
+        width: 48px;
+        border-radius: 18px;
+        color: #b94a48 !important;
+        background: rgba(185, 74, 72, 0.08);
+      }
+      #nav-btn-logout .nav-text { display: none; }
+      .main-content {
+        overscroll-behavior: contain;
+        padding-bottom: calc(96px + env(safe-area-inset-bottom));
+      }
+      .view-section > header {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+        padding-top: calc(20px + env(safe-area-inset-top)) !important;
+      }
+      .view-section > header .flex.items-center.gap-2 { width: 100%; flex-wrap: wrap; }
+      .view-section > header button { min-height: 42px; }
+    }
+
+    @media (min-width: 768px) {
+      .nav-container {
+        order: 1;
+        width: 272px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        padding: 24px 18px;
+        border-right: 1px solid rgba(223, 231, 223, 0.9);
+        box-shadow: 16px 0 45px rgba(47, 76, 55, 0.06);
+        position: relative;
+        transition: box-shadow 220ms ease, border-color 220ms ease, background-color 220ms ease;
+      }
+      .nav-item { flex-direction: row; justify-content: flex-start; padding: 13px 15px; margin-bottom: 7px; border-radius: 14px; height: auto; }
+      .active-pill { display: none; }
+    }
+
+    .nav-item { position: relative; display: flex; color: var(--app-muted); cursor: pointer; align-items: center; border: 1px solid transparent; }
+    .nav-item.hidden { display: none !important; }
+    .nav-item:hover { background-color: rgba(47, 125, 87, 0.08); color: var(--app-accent-strong); border-color: rgba(47, 125, 87, 0.12); }
+    .nav-item.active-nav { color: var(--app-accent-strong) !important; background: linear-gradient(135deg, #e7f3eb 0%, #f7fbf8 100%); font-weight: 800; border-color: rgba(47, 125, 87, 0.18); box-shadow: inset 3px 0 0 var(--app-accent), var(--app-shadow-soft); }
+    .nav-item.active-nav .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
+
+    @media (max-width: 767px) {
+      .nav-item.active-nav {
+        color: var(--app-accent-strong) !important;
+        background: linear-gradient(180deg, rgba(231, 243, 235, 0.98), rgba(247, 251, 248, 0.94));
+        border-color: rgba(47, 125, 87, 0.14);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 9px 22px rgba(47, 125, 87, 0.12);
+      }
+      .nav-item.active-nav .material-symbols-outlined { transform: translateY(-1px); }
+    }
+
+    @media (min-width: 768px) {
+      .sidebar-collapsed { width: 88px !important; padding-left: 12px !important; padding-right: 12px !important; }
+      .sidebar-collapsed .nav-text { display: none !important; }
+      .sidebar-collapsed .nav-item { justify-content: center !important; padding: 14px 0 !important; margin-left: auto; margin-right: auto; width: 48px; height: 48px; border-radius: 14px; }
+      .sidebar-collapsed .nav-item span.md\:mr-3 { margin-right: 0 !important; }
+      .sidebar-collapsed #sidebar-username,
+      .sidebar-collapsed #sidebar-role { display: none !important; }
+      .sidebar-collapsed #sidebar-avatar-wrapper { width: 48px !important; height: 48px !important; margin-bottom: 0 !important; border-radius: 14px !important; transform: rotate(0deg) !important; }
+      .sidebar-collapsed #sidebar-avatar-wrapper img { width: 34px !important; height: 34px !important; }
+      .sidebar-collapsed #sidebar-user-box { padding-bottom: 12px !important; margin-bottom: 16px !important; }
+    }
+
+    .main-content { flex: 1; overflow-y: auto; position: relative; order: 1; background: transparent; }
+    @media (min-width: 768px) { .main-content { order: 2; } }
+
+    .view-section { display: none; width: 100%; min-height: 100%; }
+    .view-section.active { display: block; animation: viewFadeIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .view-section > header { box-shadow: none !important; border-bottom: 1px solid rgba(223, 231, 223, 0.75); }
+    .view-section h1, .view-section h2 { text-wrap: balance; letter-spacing: 0; }
+    .view-section p { text-wrap: pretty; }
+    .bg-white, .bg-white\/80 { box-shadow: var(--app-shadow-soft); }
+    .shadow-md, .shadow-lg, .shadow-sm { box-shadow: var(--app-shadow-soft) !important; }
+    .app-boot {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 22% 18%, rgba(47, 125, 87, 0.14), transparent 22rem),
+        radial-gradient(circle at 84% 14%, rgba(138, 106, 61, 0.10), transparent 24rem),
+        var(--app-bg);
+    }
+    .app-boot.hidden { display: none !important; }
+    .app-boot-card {
+      width: min(420px, 100%);
+      border: 1px solid rgba(223, 231, 223, 0.9);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: var(--app-shadow);
+      backdrop-filter: blur(18px);
+      padding: 28px;
+      text-align: center;
+    }
+    .app-boot-icon {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 16px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      color: var(--app-accent-strong);
+      background: var(--app-accent-soft);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    .hospital-logo {
+      width: 72%;
+      height: 72%;
+      object-fit: contain;
+      display: block;
+    }
+    .app-boot-title {
+      color: var(--app-text);
+      font-size: 19px;
+      line-height: 1.3;
+      font-weight: 900;
+    }
+    .app-boot-text {
+      margin-top: 8px;
+      color: var(--app-muted);
+      font-size: 13px;
+      line-height: 1.65;
+      font-weight: 700;
+    }
+    .app-boot-bar {
+      position: relative;
+      height: 6px;
+      margin-top: 22px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e8eee8;
+    }
+    .app-boot-bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: 42%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--app-accent), var(--app-accent-strong));
+      animation: appBootSlide 1.15s ease-in-out infinite;
+    }
+    @keyframes viewFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes appBootSlide {
+      0% { transform: translateX(-120%); }
+      52% { transform: translateX(95%); }
+      100% { transform: translateX(260%); }
+    }
+
+    .custom-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background-color: rgba(102, 117, 107, 0.32); border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
+    .custom-scroll:hover::-webkit-scrollbar-thumb { background-color: rgba(47, 125, 87, 0.42); }
+    .login-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background:
+        radial-gradient(circle at 12% 12%, rgba(47, 125, 87, 0.16), transparent 26rem),
+        radial-gradient(circle at 88% 8%, rgba(138, 106, 61, 0.12), transparent 24rem),
+        var(--app-bg);
+    }
+    .login-shell.hidden { display: none !important; }
+    .login-card {
+      width: min(430px, 100%);
+      border: 1px solid rgba(223, 231, 223, 0.92);
+      border-radius: 24px;
+      padding: 28px;
+      background: rgba(255, 255, 255, 0.84);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--app-shadow);
+    }
+    .login-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(223, 231, 223, 0.8);
+    }
+    .login-brand-mark {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: var(--app-accent-strong);
+      background: var(--app-accent-soft);
+      font-weight: 900;
+    }
+    .login-brand-mark img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      display: block;
+    }
+    .login-brand strong { display: block; font-size: 15px; line-height: 1.2; font-weight: 900; }
+    .login-brand span { display: block; margin-top: 3px; color: var(--app-muted); font-size: 11px; line-height: 1.35; font-weight: 700; }
+    .login-heading { margin-bottom: 24px; }
+    .login-heading h1 { font-size: 28px; line-height: 1.08; font-weight: 900; letter-spacing: 0; }
+    .login-heading p { margin-top: 8px; color: var(--app-muted); font-size: 14px; font-weight: 600; line-height: 1.55; }
+    .login-field { margin-bottom: 16px; }
+    .login-field label { display: block; margin: 0 0 8px 2px; color: #425248; font-size: 13px; font-weight: 800; }
+    .login-input-wrap { position: relative; }
+    .login-input-wrap .material-symbols-outlined {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #8a9a90;
+      font-size: 21px;
+    }
+    .login-input {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid var(--app-line);
+      border-radius: 16px;
+      background: rgba(248, 250, 247, 0.82);
+      padding: 0 15px 0 48px;
+      color: var(--app-text);
+      font-size: 15px;
+      font-weight: 700;
+      outline: none;
+    }
+    .login-input-wrap.has-action .login-input { padding-right: 50px; }
+    .login-input:focus {
+      background: white;
+      border-color: rgba(47, 125, 87, 0.65);
+      box-shadow: 0 0 0 4px rgba(47, 125, 87, 0.12);
+    }
+    .login-input[aria-invalid="true"] {
+      border-color: rgba(185, 74, 72, 0.72);
+      background: rgba(255, 248, 247, 0.9);
+    }
+    .field-error {
+      min-height: 16px;
+      margin: 6px 0 0 2px;
+      color: var(--app-danger);
+      font-size: 11.5px;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+    .password-toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      color: #718178;
+      background: transparent;
+      cursor: pointer;
+    }
+    .password-toggle .material-symbols-outlined { position: static; transform: none; font-size: 21px; }
+    .login-button {
+      width: 100%;
+      min-height: 56px;
+      margin-top: 6px;
+      border: 0;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--app-accent) 0%, var(--app-accent-strong) 100%);
+      color: white;
+      font-size: 15px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      cursor: pointer;
+      box-shadow: 0 16px 34px rgba(47, 125, 87, 0.24);
+    }
+    .login-button:disabled { opacity: 0.72; cursor: wait; }
+    .login-status {
+      min-height: 18px;
+      margin-top: 12px;
+      color: var(--app-muted);
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 800;
+      text-align: center;
+    }
+    .login-status[data-state="error"] { color: var(--app-danger); }
+    .login-status[data-state="success"] { color: var(--app-accent-strong); }
+    .role-panel {
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid rgba(223, 231, 223, 0.92);
+      border-radius: 18px;
+      background: rgba(248, 250, 247, 0.82);
+    }
+    .role-panel.hidden { display: none; }
+    .role-panel-title { margin: 0 0 10px; font-size: 13px; font-weight: 900; }
+    .role-panel-actions { display: grid; gap: 10px; }
+    .role-choice-btn {
+      width: 100%;
+      padding: 14px 15px;
+      border: 1px solid rgba(223, 231, 223, 0.92);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--app-text);
+      text-align: left;
+    }
+    .role-choice-title { font-size: 14px; font-weight: 900; }
+    .role-choice-desc { margin-top: 4px; color: var(--app-muted); font-size: 12px; line-height: 1.45; font-weight: 700; }
+    .role-cancel-btn {
+      margin-top: 10px;
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid rgba(185, 74, 72, 0.18);
+      border-radius: 14px;
+      color: var(--app-danger);
+      background: rgba(255, 248, 247, 0.86);
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-boot" id="app-boot" role="status" aria-live="polite">
+    <div class="app-boot-card">
+      <div class="app-boot-icon" aria-hidden="true">
+        <img class="hospital-logo" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhQqL80XzkD6LL4vftRz2W9TiLyWuFSE8dVNQE-OoLikLZ6osupFjvcQHDPrhnnHgkt6E8fvBi8D7BkKcb5IZp9PTjvtqHEnv3nuh-O3eKh7xZkiwpXRoxv5DxF9aY8A0hqsEcSLnLnRZluDvrYIA1MXEPZ3geJs49lGtPatOib-bSMXPHh6svaRB7hGeM8/s1600/apple-touch-icon-96x96.png" alt="">
+      </div>
+      <div class="app-boot-title" id="app-boot-title">&#272;ang kh&#244;i ph&#7909;c phi&#234;n</div>
+      <div class="app-boot-text" id="app-boot-text">H&#7879; th&#7889;ng &#273;ang x&#225;c minh t&#224;i kho&#7843;n v&#224; chu&#7849;n b&#7883; kh&#244;ng gian l&#224;m vi&#7879;c.</div>
+      <div class="app-boot-bar" aria-hidden="true"></div>
+    </div>
+  </div>
+<section class="login-shell hidden" id="login-shell" aria-label="&#272;&#259;ng nh&#7853;p h&#7879; th&#7889;ng">
+    <form class="login-card" onsubmit="handleLogin(); return false;">
+      <div class="login-brand">
+        <div class="login-brand-mark" aria-hidden="true">
+          <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhQqL80XzkD6LL4vftRz2W9TiLyWuFSE8dVNQE-OoLikLZ6osupFjvcQHDPrhnnHgkt6E8fvBi8D7BkKcb5IZp9PTjvtqHEnv3nuh-O3eKh7xZkiwpXRoxv5DxF9aY8A0hqsEcSLnLnRZluDvrYIA1MXEPZ3geJs49lGtPatOib-bSMXPHh6svaRB7hGeM8/s1600/apple-touch-icon-96x96.png" alt="">
+        </div>
+        <div>
+          <strong>83 Ti&#234;u ch&#237;</strong>
+          <span>H&#7879; th&#7889;ng &#273;&#225;nh gi&#225; ch&#7845;t l&#432;&#7907;ng b&#7879;nh vi&#7879;n</span>
+        </div>
+      </div>
+
+      <div class="login-heading">
+        <h1>&#272;&#259;ng nh&#7853;p</h1>
+        <p>Nh&#7853;p t&#224;i kho&#7843;n &#273;&#227; &#273;&#432;&#7907;c c&#7845;p trong sheet c&#7845;u h&#236;nh.</p>
+      </div>
+
+      <div class="login-field">
+        <label for="login-username">T&#224;i kho&#7843;n</label>
+        <div class="login-input-wrap">
+          <span class="material-symbols-outlined" aria-hidden="true">person</span>
+          <input type="text" id="login-username" class="login-input" autocomplete="username" placeholder="Nh&#7853;p t&#224;i kho&#7843;n" aria-describedby="login-username-error">
+        </div>
+        <div class="field-error" id="login-username-error" aria-live="polite"></div>
+      </div>
+
+      <div class="login-field">
+        <label for="login-password">M&#7853;t kh&#7849;u</label>
+        <div class="login-input-wrap has-action">
+          <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+          <input type="password" id="login-password" class="login-input" autocomplete="current-password" placeholder="Nh&#7853;p m&#7853;t kh&#7849;u" aria-describedby="login-password-error">
+          <button type="button" class="password-toggle" onclick="togglePasswordVisibility()" aria-label="Hi&#7879;n m&#7853;t kh&#7849;u" aria-pressed="false" id="password-toggle-btn">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+          </button>
+        </div>
+        <div class="field-error" id="login-password-error" aria-live="polite"></div>
+      </div>
+
+      <button type="submit" id="btn-login" class="login-button" aria-busy="false">
+        <span>&#272;&#259;ng nh&#7853;p</span>
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">login</span>
+      </button>
+
+      <div class="login-status" id="login-status" aria-live="polite"></div>
+
+      <div class="role-panel hidden" id="role-selection-panel" aria-live="polite">
+        <p class="role-panel-title">Ch&#7885;n vai tr&#242; l&#224;m vi&#7879;c</p>
+        <div class="role-panel-actions" id="role-selection-actions"></div>
+        <button type="button" class="role-cancel-btn" id="role-selection-cancel">H&#7911;y v&#224; nh&#7853;p l&#7841;i</button>
+      </div>
+    </form>
+  </section>
+
+  <div class="app-wrapper hidden" id="app-root">
+
+    <nav class="nav-container animate-[fadeIn_0.3s_ease-out]" id="side-nav" aria-label="Điều hướng chính">
+      
+      <!-- Nút thu/phóng sidebar (Chỉ hiện trên desktop) -->
+      <button type="button" id="sidebar-toggle" onclick="toggleSidebar()" class="hidden md:flex absolute top-10 -right-3.5 w-7 h-7 bg-white border border-gray-200 rounded-full items-center justify-center shadow-md text-gray-500 hover:text-[#16a34a] hover:border-[#16a34a] transition-all z-50 focus:outline-none cursor-pointer" aria-label="Thu gọn thanh điều hướng">
+        <span class="material-symbols-outlined text-[18px] font-black">chevron_left</span>
+      </button>
+
+      <!-- Thông tin User (Chỉ hiện trên Desktop) -->
+      <div class="hidden md:flex flex-col items-center mb-8 pb-6 border-b border-gray-100 transition-all duration-300" id="sidebar-user-box">
+        <div class="w-20 h-20 bg-green-100 rounded-[24px] flex items-center justify-center text-green-600 mb-4 shadow-inner rotate-3 transition-all duration-300" id="sidebar-avatar-wrapper">
+          <img class="hospital-logo" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhQqL80XzkD6LL4vftRz2W9TiLyWuFSE8dVNQE-OoLikLZ6osupFjvcQHDPrhnnHgkt6E8fvBi8D7BkKcb5IZp9PTjvtqHEnv3nuh-O3eKh7xZkiwpXRoxv5DxF9aY8A0hqsEcSLnLnRZluDvrYIA1MXEPZ3geJs49lGtPatOib-bSMXPHh6svaRB7hGeM8/s1600/apple-touch-icon-96x96.png" alt="">
+        </div>
+        <div class="text-[16px] font-black text-gray-800 text-center leading-tight mb-1 transition-opacity duration-300" id="sidebar-username">&#272;ang t&#7843;i...</div>
+      <div class="text-[11px] font-bold text-gray-400 text-center uppercase tracking-wider transition-opacity duration-300" id="sidebar-role">...</div>
+      </div>
+
+      <button type="button" onclick="switchView('view-dashboard')" id="nav-btn-dashboard" class="nav-item" aria-label="Tổng quan">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">dashboard</span>
+        <span class="nav-text text-[15px]">T&#7893;ng quan</span>
+      </button>
+      <button type="button" onclick="switchView('view-checklist')" id="nav-btn-checklist" class="nav-item" aria-label="Chấm điểm">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">fact_check</span>
+        <span class="nav-text text-[15px]">Ch&#7845;m &#273;i&#7875;m</span>
+      </button>
+      <button type="button" onclick="switchView('view-evidence')" id="nav-btn-evidence" class="nav-item hidden" aria-label="Quan ly minh chung">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">folder_managed</span>
+        <span class="nav-text text-[15px]">Minh ch&#7913;ng</span>
+      </button>
+      <button type="button" onclick="switchView('view-result')" id="nav-btn-result" class="nav-item" aria-label="Xem kết quả">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">insert_chart</span>
+        <span class="nav-text text-[15px]">Xem k&#7871;t qu&#7843;</span>
+      </button>
+      <button type="button" onclick="switchView('view-lab2429')" id="nav-btn-lab2429" class="nav-item hidden" aria-label="Xét nghiệm">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">biotech</span>
+        <span class="nav-text text-[15px]">X&#233;t nghi&#7879;m</span>
+      </button>
+
+      <button type="button" onclick="switchView('view-biosafety')" id="nav-btn-biosafety" class="nav-item hidden" aria-label="An toan sinh hoc">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">health_and_safety</span>
+        <span class="nav-text text-[15px]">ATSH</span>
+      </button>
+
+      <button type="button" onclick="switchView('view-admin')" id="nav-btn-admin" class="nav-item hidden" aria-label="Quản trị">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">admin_panel_settings</span>
+        <span class="nav-text text-[15px]">Qu&#7843;n tr&#7883;</span>
+      </button>
+
+      <button type="button" onclick="switchView('view-account')" id="nav-btn-account" class="nav-item" aria-label="Tài khoản">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">manage_accounts</span>
+        <span class="nav-text text-[15px]">T&#224;i kho&#7843;n</span>
+      </button>
+
+      <div class="md:mt-auto"></div>
+      <button type="button" onclick="logoutApp()" id="nav-btn-logout" class="nav-item hover:bg-red-50 hover:text-red-600 !text-red-400 md:mt-4" aria-label="Đăng xuất">
+        <span class="material-symbols-outlined text-[26px] md:mr-3 relative z-10 transition-all duration-300">power_settings_new</span>
+        <span class="nav-text text-[15px] font-bold">&#272;&#259;ng xu&#7845;t</span>
+      </button>
+    </nav>
+
+    <!-- NỘI DUNG LÀM VIỆC CHÍNH -->
+    <main class="main-content custom-scroll" id="main-scroll-area">
+      <?!= include('300_DashboardView'); ?> 
+      <?!= include('310_ChecklistView'); ?> 
+      <?!= include('320_EvidenceView'); ?> 
+      <?!= include('330_ResultView'); ?> 
+      <?!= include('340_Lab2429View'); ?> 
+      <?!= include('342_BiosafetyView'); ?> 
+      <?!= include('350_AdminView'); ?> 
+      <?!= include('360_AccountView'); ?> 
+    </main>
+
+  </div>
+
+  <?!= include('110_UI_Runtime'); ?>
+  <?!= include('301_Controller_Dashboard'); ?>
+  <?!= include('311_Controller_Checklist'); ?>
+  <?!= include('321_Controller_Evidence'); ?>
+  <?!= include('331_Controller_Result'); ?>
+  <?!= include('341_Controller_Lab2429'); ?>
+  <?!= include('343_Controller_Biosafety'); ?>
+  <?!= include('351_Controller_Admin'); ?>
+  <?!= include('361_Controller_Account'); ?>
+  <?!= include('211_Controller_Login'); ?>
+  <?!= include('120_UI_Router'); ?>
+</body>
+</html>

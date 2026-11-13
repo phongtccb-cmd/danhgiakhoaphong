@@ -1,0 +1,476 @@
+<!-- 331_Controller_Result.html: client-side behavior for 330_ResultView.html. -->
+<script>
+    // Biến toàn cục cache lưu trữ kết quả của Khoa phục vụ xuất Excel liên kết
+    let activeResultData = null;
+    let pendingResultFocusMaTC = '';
+    let resultCurrentPage = 1;
+    let resultPageSize = 10;
+    const RESULT_XLSX_URL = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+
+    function escapeResultHtml(value) {
+      return window.App.utils.escapeHtml(value);
+    }
+
+    function initResultUI() {
+      const boxFilter = document.getElementById('result-filter-box');
+      const selector = document.getElementById('result-khoa-selector');
+      
+      document.getElementById('result-data-container').classList.add('hidden');
+      document.getElementById('export-btn-container').classList.add('hidden');
+      activeResultData = null;
+      
+      if (currentUser.role === 'Khoa') {
+        boxFilter.classList.add('hidden');
+        boxFilter.classList.remove('flex');
+        const khoaCuaToi = currentUser.quyenTruyCap[0];
+        selector.innerHTML = '<option value="' + escapeResultHtml(khoaCuaToi) + '">' + escapeResultHtml(khoaCuaToi) + '</option>';
+        loadKetQuaKhoa(khoaCuaToi);
+      } else {
+        boxFilter.classList.remove('hidden');
+        boxFilter.classList.add('flex');
+        let opts = "<option value=\"\">-- Chọn khoa để xem kết quả --</option>";
+        (currentUser.quyenTruyCap || []).forEach(k => { opts += '<option value="' + escapeResultHtml(k) + '">' + escapeResultHtml(k) + '</option>'; });
+        selector.innerHTML = opts;
+      }
+    }
+
+    function loadKetQuaKhoa(khoaStr, focusMaTC) {
+      const khoa = khoaStr || document.getElementById('result-khoa-selector').value;
+      pendingResultFocusMaTC = String(focusMaTC || '').trim();
+      if (!khoa) {
+        document.getElementById('result-data-container').classList.add('hidden');
+        document.getElementById('export-btn-container').classList.add('hidden');
+        activeResultData = null;
+        pendingResultFocusMaTC = '';
+        resultCurrentPage = 1;
+        return;
+      }
+
+      document.getElementById('result-data-container').classList.add('hidden');
+      document.getElementById('export-btn-container').classList.add('hidden');
+      document.getElementById('result-loading').classList.remove('hidden');
+      activeResultData = null;
+      resultCurrentPage = 1;
+
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(res => {
+          document.getElementById('result-loading').classList.add('hidden');
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (res.success) {
+            activeResultData = res.data; 
+            renderResultData(res.data);
+          } else {
+            Swal.fire('Lỗi truy xuất', res.message, 'error');
+          }
+        }).getKetQuaTongHop(khoa, getSessionToken());
+      }
+    }
+
+    function focusResultCriteria(maTC) {
+      const code = String(maTC || '').trim();
+      if (!code) return;
+      const rows = Array.from(document.querySelectorAll('[data-result-ma-tc]'));
+      const row = rows.find(item => item.getAttribute('data-result-ma-tc') === code);
+      if (!row) {
+        if (activeResultData && Array.isArray(activeResultData.details)) {
+          const foundIndex = activeResultData.details.findIndex(item => String(item.maTC || '').trim() === code);
+          if (foundIndex >= 0) {
+            resultCurrentPage = Math.floor(foundIndex / resultPageSize) + 1;
+            renderResultData(activeResultData);
+            window.setTimeout(() => focusResultCriteria(code), 80);
+          }
+        }
+        return;
+      }
+
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('result-highlight-row');
+      window.setTimeout(() => row.classList.remove('result-highlight-row'), 3600);
+    }
+
+    function updateResultPager(totalRows, page, pageSize, pageCount) {
+      const summary = document.getElementById('result-page-summary');
+      const pageSizeEl = document.getElementById('result-page-size');
+      const prevBtn = document.getElementById('result-prev-page');
+      const nextBtn = document.getElementById('result-next-page');
+      const label = document.getElementById('result-page-label');
+      const start = totalRows ? ((page - 1) * pageSize + 1) : 0;
+      const end = totalRows ? Math.min(totalRows, page * pageSize) : 0;
+
+      if (summary) summary.innerText = 'Hiển thị ' + start + '-' + end + ' trong tổng ' + totalRows + ' tiêu chí';
+      if (pageSizeEl) pageSizeEl.value = String(pageSize);
+      if (label) label.innerText = 'Trang ' + page + ' / ' + pageCount;
+      if (prevBtn) prevBtn.disabled = page <= 1;
+      if (nextBtn) nextBtn.disabled = page >= pageCount;
+    }
+
+    function changeResultPageSize(value) {
+      resultPageSize = Math.max(1, parseInt(value, 10) || 10);
+      resultCurrentPage = 1;
+      if (activeResultData) renderResultData(activeResultData);
+    }
+
+    function changeResultPage(delta) {
+      resultCurrentPage += parseInt(delta, 10) || 0;
+      if (activeResultData) renderResultData(activeResultData);
+    }
+
+    function renderResultData(data) {
+      document.getElementById('result-data-container').classList.remove('hidden');
+      document.getElementById('result-data-container').classList.add('flex');
+      document.getElementById('export-btn-container').classList.remove('hidden'); 
+
+      document.getElementById('res-total-max').innerText = data.totalMax;
+      document.getElementById('res-total-bv').innerText = data.totalBV;
+      document.getElementById('res-total-doan').innerText = data.totalDoan;
+
+      const ptBv = data.totalMax > 0 ? ((data.totalBV / data.totalMax) * 100).toFixed(1) : 0;
+      const ptDoan = data.totalMax > 0 ? ((data.totalDoan / data.totalMax) * 100).toFixed(1) : 0;
+      
+      document.getElementById('res-percent-bv').innerText = "(" + ptBv + "%)";
+      document.getElementById('res-percent-doan').innerText = "(" + ptDoan + "%)";
+
+      const tbody = document.getElementById('result-table-body');
+      const allDetails = Array.isArray(data.details) ? data.details : [];
+      const totalRows = allDetails.length;
+      const pageCount = Math.max(1, Math.ceil(totalRows / resultPageSize));
+      resultCurrentPage = Math.min(Math.max(1, resultCurrentPage), pageCount);
+      const startIndex = (resultCurrentPage - 1) * resultPageSize;
+      const pageDetails = allDetails.slice(startIndex, startIndex + resultPageSize);
+      updateResultPager(totalRows, resultCurrentPage, resultPageSize, pageCount);
+
+      if (totalRows === 0) {
+        tbody.innerHTML = "<tr><td colspan=\"6\" class=\"p-6 text-center text-gray-400 italic\">Chưa có dữ liệu đánh giá nào cho Khoa này.</td></tr>";
+        return;
+      }
+
+      // Grouping Data
+      const tree = {};
+      pageDetails.forEach(row => {
+        const nhom = row.nhom;
+        const phanNhom = row.phanNhom;
+
+        if (!tree[nhom]) tree[nhom] = {};
+        if (!tree[nhom][phanNhom]) tree[nhom][phanNhom] = [];
+        
+        tree[nhom][phanNhom].push(row);
+      });
+
+      let trs = "";
+
+      // Render Loop trên Giao diện Web
+      Object.keys(tree).sort().forEach(nhom => {
+        let tongMax = 0, tongBv = 0, tongDoan = 0, countTC = 0;
+        Object.keys(tree[nhom]).forEach(pn => {
+          tree[nhom][pn].forEach(tc => {
+            tongMax += tc.max; tongBv += tc.bv; tongDoan += tc.doan; countTC++;
+          });
+        });
+
+        trs += 
+          '<tr class="result-group-row bg-slate-700 text-white border-b border-slate-800">' +
+            '<td colspan="2" class="p-3 pl-4 font-black uppercase text-[13px] tracking-wide shadow-inner">' +
+              nhom + '<span class="font-normal text-slate-300 ml-2">(' + countTC + ' tiêu chí)</span>' +
+            '</td>' +
+            '<td class="p-3 text-center font-bold text-slate-300">' + tongMax + '</td>' +
+            '<td class="p-3 text-center font-bold text-green-300">' + tongBv + '</td>' +
+            '<td class="p-3 text-center font-bold text-blue-300">' + tongDoan + '</td>' +
+            '<td></td>' +
+          '</tr>';
+
+        Object.keys(tree[nhom]).sort().forEach(phanNhom => {
+          const listTC = tree[nhom][phanNhom];
+          
+          trs += 
+            '<tr class="result-subgroup-row bg-slate-200/70 border-b border-gray-300">' +
+              '<td colspan="6" class="p-2 pl-6 font-bold text-slate-800 text-[13px]">' +
+                '<span class="material-symbols-outlined text-[16px] align-middle mr-1 text-slate-500">subdirectory_arrow_right</span>' +
+                phanNhom +
+              '</td>' +
+            '</tr>';
+
+          listTC.sort((a, b) => a.maTC.localeCompare(b.maTC)).forEach(row => {
+            let diffColor = 'text-gray-800';
+            if (row.doan < row.bv && row.doan > 0) diffColor = 'text-red-500 font-bold';
+            else if (row.doan > 0 && row.doan === row.bv) diffColor = 'text-blue-700 font-bold';
+
+            const formattedDoan = row.doan > 0 ? row.doan : '-';
+            const stateLabel = row.trangThai.includes('Đã hoàn thành') ? '✅ Đã xong' : '⏳ Dang dở';
+            const stateClass = row.trangThai.includes('Đã hoàn thành') ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700';
+
+            trs += 
+              '<tr class="border-b border-gray-100 hover:bg-slate-50 transition-colors" data-result-ma-tc="' + escapeResultHtml(row.maTC) + '">' +
+                '<td class="p-3 text-center font-bold text-[#16a34a] text-[13px] border-r border-gray-100">' + escapeResultHtml(row.maTC) + '</td>' +
+                '<td class="p-3 text-[13px] text-gray-700 border-r border-gray-100 leading-snug pr-8">' + escapeResultHtml(row.noiDung) + '</td>' +
+                '<td class="p-3 text-center font-bold text-gray-400 border-r border-gray-100">' + escapeResultHtml(row.max) + '</td>' +
+                '<td class="p-3 text-center font-bold text-green-700 bg-green-50/20 border-r border-gray-100">' + escapeResultHtml(row.bv) + '</td>' +
+                '<td class="p-3 text-center font-bold bg-blue-50/20 ' + diffColor + ' border-r border-gray-100">' + escapeResultHtml(formattedDoan) + '</td>' +
+                '<td class="p-3">' +
+                  '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold ' + stateClass + '">' +
+                    stateLabel +
+                  '</span>' +
+                '</td>' +
+              '</tr>';
+          });
+        });
+      });
+
+      tbody.innerHTML = trs;
+      if (pendingResultFocusMaTC) {
+        const maTC = pendingResultFocusMaTC;
+        pendingResultFocusMaTC = '';
+        window.setTimeout(() => focusResultCriteria(maTC), 120);
+      }
+    }
+
+    // ==========================================
+    // CÁC HÀM HELPER ĐỂ TRÍCH XUẤT THÔNG TIN CHO BIÊN BẢN KIỂM TRA EXCEL
+    // ==========================================
+    function getUniqueProperty(chiTiet, propName) {
+      if (!chiTiet || !Array.isArray(chiTiet)) return "";
+      const vals = chiTiet.map(item => String(item[propName] || "").trim()).filter(Boolean);
+      return [...new Set(vals)].join(", ");
+    }
+
+    function getLyDoChuaDat(chiTiet) {
+      if (!chiTiet || !Array.isArray(chiTiet)) return "";
+      const failedTms = [];
+      chiTiet.forEach(item => {
+        const score = getDoanScoreValue(item);
+        
+        if (score === "0") {
+          const match = String(item.noidungtc || "").match(/^(\d+)/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            failedTms.push("TM" + (num < 10 ? "0" + num : num));
+          } else {
+            failedTms.push(item.id);
+          }
+        }
+      });
+      if (failedTms.length > 0) {
+        return failedTms.join(", ") + " chưa đạt";
+      }
+      return "";
+    }
+
+    function getDoanScoreValue(item) {
+      if (!item) return "";
+      if (item.diemtc_doan !== undefined && item.diemtc_doan !== "") return String(item.diemtc_doan);
+      if (item.diem_doan !== undefined && item.diem_doan !== "") return String(item.diem_doan);
+      if (item.diem !== undefined && item.diem !== "") return String(item.diem);
+      return "";
+    }
+
+    function hasDoanScoreInDetails(chiTiet) {
+      return Array.isArray(chiTiet) && chiTiet.some(item => getDoanScoreValue(item) !== "");
+    }
+
+    function getBienBanScoreWeight(maTC) {
+      const code = String(maTC || '').trim().toUpperCase();
+      return /^C5\.[1-5]$/.test(code) ? 2 : 1;
+    }
+
+    // =========================================================================
+    // ĐỘNG CƠ XUẤT BIÊN BẢN EXCEL - CHUẨN ĐỊNH DẠNG IN ẤN A4 NGANG (LANDSCAPE)
+    // =========================================================================
+    async function exportResultToExcel() {
+      if (!activeResultData) {
+        Swal.fire("Không tìm thấy dữ liệu", "Vui lòng tải dữ liệu báo cáo trước khi xuất file.", "warning");
+        return;
+      }
+
+      try {
+        await window.App.utils.loadScriptOnce(RESULT_XLSX_URL, 'XLSX');
+      } catch (error) {
+        Swal.fire('Không thể tải thư viện Excel', error && error.message ? error.message : 'Vui lòng kiểm tra kết nối mạng và thử lại.', 'error');
+        return;
+      }
+
+      const ws = {};
+      const merges = [];
+      
+      // Khai báo Style mẫu chuẩn hóa theo bộ Font hành chính Times New Roman
+      const fontName = 'Times New Roman';
+      const styleTitle = { font: { name: fontName, sz: 16, bold: true }, alignment: { horizontal: 'center', vertical: 'center' } };
+      const styleSubTitle = { font: { name: fontName, sz: 11, italic: true }, alignment: { horizontal: 'center', vertical: 'center' } };
+      const styleHeaderBox = { font: { name: fontName, sz: 11, bold: true } };
+      const styleHeaderRegular = { font: { name: fontName, sz: 11 } };
+      
+      const styleTh = {
+        font: { name: fontName, sz: 11, bold: true, color: { rgb: '000000' } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        fill: { fgColor: { rgb: 'F1F5F9' } }, // Nền xám Slate nhạt sang trọng
+        border: getFullBorder()
+      };
+      
+      const styleTdCenter = { font: { name: fontName, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' }, border: getFullBorder() };
+      const styleTdLeft = { font: { name: fontName, sz: 11 }, alignment: { horizontal: 'left', vertical: 'center' }, border: getFullBorder() };
+      const styleTdReason = { font: { name: fontName, sz: 11 }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: getFullBorder() };
+      const styleTdBoldCenter = { font: { name: fontName, sz: 11, bold: true }, alignment: { horizontal: 'center', vertical: 'center' }, border: getFullBorder() };
+
+      let r = 0; // Con trỏ hàng (Row index chạy từ 0)
+
+      // Hàm đóng gói ô dữ liệu kèm Style
+      function setCell(row, col, value, styleObj, type = 's') {
+        const ref = XLSX.utils.encode_cell({ r: row, c: col });
+        ws[ref] = { v: value, t: type, s: styleObj };
+      }
+
+      function getFullBorder() {
+        return {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        };
+      }
+
+      // --- PHẦN 1: TIÊU ĐỀ HÀNH CHÍNH PHỎNG THEO PDF ---
+      const appSettings = activeResultData.appSettings || {};
+      const reportTitle = appSettings.report_title || "BIÊN BẢN KIỂM TRA BỆNH VIỆN NĂM 2026";
+      const reportPlanLine = appSettings.report_plan_line || "(Đính kèm Kế hoạch số 2559/KH-BV ngày 30 tháng 6 năm 2025 của Bệnh viện)";
+
+      setCell(r, 0, "Phụ lục 3", styleHeaderBox);
+      r++; r++; // Nhảy cách dòng
+      
+      setCell(r, 0, reportTitle, styleTitle);
+      merges.push({ s: { r: r, c: 0 }, e: { r: r, c: 5 } });
+      r++;
+      
+      setCell(r, 0, reportPlanLine, styleSubTitle);
+      merges.push({ s: { r: r, c: 0 }, e: { r: r, c: 5 } });
+      r++; r++;
+      
+      setCell(r, 0, "Nguyên tắc đánh giá:", styleHeaderBox);
+      r++;
+      setCell(r, 0, "- Mỗi tiêu chí được đánh giá chia theo 5 mức, bao gồm từ mức 1 đến mức 5.", styleHeaderRegular);
+      r++;
+      setCell(r, 0, "- Tiêu chí được xếp ở mức 1 nếu có bất kỳ một tiểu mục nào trong mức 1 không đạt.", styleHeaderRegular);
+      r++;
+      setCell(r, 0, "- Tiêu chí được xếp ở mức 2 nếu không có tiểu mục nào trong mức 1 và đạt được toàn bộ các tiểu mục trong mức 2. Tương tự như vậy đối với mức 3, 4, 5.", styleHeaderRegular);
+      r++;
+      setCell(r, 0, "- Và đề nghị các Đơn vị kiểm tra ghi rõ những tiểu mục khoa/ phòng không đạt.", styleHeaderRegular);
+      r++; r++;
+      
+      setCell(r, 0, "Đơn vị được kiểm tra: " + activeResultData.khoa, styleHeaderBox);
+      r++; r++;
+
+      // --- PHẦN 2: THIẾT LẬP CỘT TIÊU ĐỀ MA TRẬN BẢNG ---
+      const headers = ["STT", "TIÊU CHÍ", "MỨC ĐẠT", "KHOA/PHÒNG PHỤ TRÁCH", "NGƯỜI ĐƠN VỊ KIỂM TRA", "LÝ DO (Ghi rõ tiểu mục chưa đạt)"];
+      headers.forEach((h, cIdx) => setCell(r, cIdx, h, styleTh));
+      r++;
+
+      // --- PHẦN 3: ĐỔ DỮ LIỆU TIÊU CHÍ ĐÃ SẮP XẾP ---
+      const sortedDetails = [...activeResultData.details].sort((a, b) => a.maTC.localeCompare(b.maTC));
+      const weightedTotalScore = sortedDetails.reduce((sum, row) => {
+        const score = hasDoanScoreInDetails(row.ChiTiet) ? Number(row.doan || 0) : 0;
+        return sum + (score * getBienBanScoreWeight(row.maTC));
+      }, 0);
+      const averageDivisor = sortedDetails.reduce((sum, row) => sum + getBienBanScoreWeight(row.maTC), 0);
+      
+      sortedDetails.forEach((row, idx) => {
+        const finalScore = hasDoanScoreInDetails(row.ChiTiet) ? Number(row.doan || 0) : "-";
+        const depCode = getUniqueProperty(row.ChiTiet, "phong"); // Đọc trường phong từ JSON gốc (Khoa phòng phụ trách)
+        const checkerName = getUniqueProperty(row.ChiTiet, "nguoicham"); // Đọc người kiểm tra
+        const reasonText = getLyDoChuaDat(row.ChiTiet); // Trích xuất các TM không đạt
+
+        setCell(r, 0, idx + 1, styleTdCenter, 'n');
+        setCell(r, 1, row.maTC, styleTdBoldCenter);
+        setCell(r, 2, finalScore, styleTdBoldCenter, typeof finalScore === 'number' ? 'n' : 's');
+        setCell(r, 3, depCode, styleTdLeft);
+        setCell(r, 4, checkerName, styleTdLeft);
+        setCell(r, 5, reasonText, styleTdReason);
+        r++;
+      });
+      
+      r++; // Dòng cách
+
+      // --- PHẦN 4: KHỐI TỔNG HỢP VÀ ĐIỂM SỐ DƯỚI CHÂN ---
+      setCell(r, 0, "Tổng số tiêu chí áp dụng:", styleHeaderBox);
+      setCell(r, 1, sortedDetails.length, styleHeaderBox, 'n');
+      r++;
+      
+      setCell(r, 0, "Tổng điểm đạt được:", styleHeaderBox);
+      setCell(r, 1, weightedTotalScore, styleHeaderBox, 'n');
+      r++;
+      
+      const avgScoreCalc = averageDivisor > 0 ? (weightedTotalScore / averageDivisor).toFixed(2) : "0.00";
+      setCell(r, 0, "Điểm trung bình:", styleHeaderBox);
+      setCell(r, 1, avgScoreCalc, styleHeaderBox, 's'); // Giữ dạng chuỗi để phẩy ngăn thập phân giống PDF
+      r++; r++;
+      
+      setCell(r, 0, "Ý kiến đoàn kiểm tra:", styleHeaderBox);
+      r++;
+      setCell(r, 0, "......................................................................................................................................................................................................................................", styleHeaderRegular);
+      r++; r++;
+      setCell(r, 0, "Ý kiến khoa/phòng:", styleHeaderBox);
+      r++;
+      setCell(r, 0, "......................................................................................................................................................................................................................................", styleHeaderRegular);
+      r++; r++; r++;
+
+      // --- PHẦN 5: CHỮ KÝ PHÂN CỘT HAI BÊN CÂN ĐỐI ĐỂ IN ---
+      const signRow1 = r;
+      setCell(signRow1, 0, "Lãnh đạo Khoa/Phòng", styleHeaderBox);
+      setCell(signRow1, 4, "Đoàn kiểm tra", styleHeaderBox);
+      merges.push({ s: { r: signRow1, c: 0 }, e: { r: signRow1, c: 1 } });
+      merges.push({ s: { r: signRow1, c: 4 }, e: { r: signRow1, c: 5 } });
+      
+      r++;
+      const signRow2 = r;
+      setCell(signRow2, 0, "(Ký và ghi rõ họ tên)", styleSubTitle);
+      setCell(signRow2, 4, "(Ký và ghi rõ họ tên)", styleSubTitle);
+      merges.push({ s: { r: signRow2, c: 0 }, e: { r: signRow2, c: 1 } });
+      merges.push({ s: { r: signRow2, c: 4 }, e: { r: signRow2, c: 5 } });
+      
+      r += 4; // Tạo khoảng không gian trống để ký tay ổn định
+      const signRow3 = r;
+      setCell(signRow3, 0, "..................................................", styleSubTitle);
+      setCell(signRow3, 4, "..................................................", styleSubTitle);
+      merges.push({ s: { r: signRow3, c: 0 }, e: { r: signRow3, c: 1 } });
+      merges.push({ s: { r: signRow3, c: 4 }, e: { r: signRow3, c: 5 } });
+
+      // --- PHẦN 6: KẾT NỐI METADATA CẤU HÌNH TRANG IN EXCEL ---
+      ws['!merges'] = merges;
+      
+      // Thiết lập độ rộng cột lý tưởng cho khổ giấy ngang
+      ws['!cols'] = [
+        { wch: 6 },   // STT
+        { wch: 12 },  // TIÊU CHÍ
+        { wch: 11 },  // MỨC ĐẠT
+        { wch: 26 },  // KHOA/PHÒNG PHỤ TRÁCH (Biến phong)
+        { wch: 26 },  // NGƯỜI ĐƠN VỊ KIỂM TRA
+        { wch: 45 }   // LÝ DO ( wrapText tự động co giãn dòng xuống hàng)
+      ];
+
+      // Đếm tổng số ô để khóa dải ref
+      const maxCellRef = XLSX.utils.encode_cell({ r: r + 2, c: 5 });
+      ws['!ref'] = "A1:" + maxCellRef;
+
+      // 💥 THIẾT LẬP CHỮA CHÁY IN ẤN: Khóa cứng khổ giấy A4, hướng in ngang (Landscape)
+      ws['!pageSetup'] = { 
+        orientation: 'landscape', // Hướng giấy ngang chuẩn biên bản Bộ Y Tế
+        paperSize: 9,             // Mã định danh 9 trong Excel tương ứng với khổ giấy A4
+        scale: 95                 // Thu nhỏ nhẹ 95% để đảm bảo nội dung ôm trọn lề không bị tràn trang
+      };
+
+      // Đặt biên lề cân đối căn giữa
+      ws['!margins'] = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+
+      // Tiến hành xuất tệp tin
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Biên Bản Kiểm Tra");
+      
+      const cleanDate = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
+      const rawFileName = "BienBanKiemTra_83TC_" + activeResultData.khoa + "_" + cleanDate + ".xlsx";
+      const fileName = rawFileName.replace(/\s+/g, '_');
+      
+      XLSX.writeFile(wb, fileName);
+
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'success',
+        title: 'Đã xuất Biên bản Excel khổ ngang A4 thành công!',
+        showConfirmButton: false, timer: 2500
+      });
+    }
+  </script>

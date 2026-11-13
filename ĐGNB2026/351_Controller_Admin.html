@@ -1,0 +1,782 @@
+<!-- 351_Controller_Admin.html: client-side behavior for 350_AdminView.html. -->
+<script>
+    let adminState = {
+      loaded: false,
+      loading: false,
+      auditLoaded: false,
+      auditLoading: false,
+      activeTab: 'users',
+      data: { settings: [], users: [], departments: [], phongs: [], assignments: [], audit: [] }
+    };
+
+    const adminTabMeta = {
+      settings: { type: 'APP', title: 'Tạo cài đặt', rows: 'settings' },
+      users: { type: 'USER', title: 'Tạo user', rows: 'users' },
+      departments: { type: 'KHOA', title: 'Tạo khoa', rows: 'departments' },
+      phongs: { type: 'PHONG', title: 'Tạo phòng', rows: 'phongs' },
+      assignments: { type: 'PHANCONG', title: 'Tạo phân công', rows: 'assignments' },
+      system: { type: 'SYSTEM', title: 'Công cụ hệ thống', rows: 'system' },
+      audit: { type: 'AUDIT', title: 'Nhật ký hệ thống', rows: 'audit' }
+    };
+
+    function initAdminUI() {
+      if (typeof canViewAdmin === 'function' ? !canViewAdmin() : (!currentUser || currentUser.role !== 'Admin')) {
+        if (typeof Swal !== 'undefined') Swal.fire('Không có quyền', 'Chỉ Admin được truy cập màn hình này.', 'warning');
+        if (typeof switchView === 'function') switchView('view-checklist');
+        return;
+      }
+      if (!adminState.loaded && !adminState.loading) {
+        loadAdminConfig(false);
+      } else {
+        renderAdminAll();
+      }
+    }
+
+    function loadAdminConfig(forceReload) {
+      if (adminState.activeTab === 'audit') {
+        if (forceReload) adminState.auditLoaded = false;
+        loadAdminAudit();
+        return;
+      }
+      if (adminState.loading) return;
+      if (adminState.loaded && !forceReload) {
+        renderAdminAll();
+        return;
+      }
+
+      adminState.loading = true;
+      setAdminLoading(true);
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            adminState.loading = false;
+            setAdminLoading(false);
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Lỗi tải cấu hình', res && res.message ? res.message : 'Không tải được cấu hình.', 'error');
+              return;
+            }
+            adminState.loaded = true;
+            adminState.data = Object.assign({ audit: adminState.data.audit || [] }, res.data || {});
+            renderAdminAll();
+            bindAdminAccessSearch();
+          })
+          .withFailureHandler(err => {
+            adminState.loading = false;
+            setAdminLoading(false);
+            Swal.fire('Lỗi kết nối', err && err.message ? err.message : String(err || 'Apps Script error'), 'error');
+          })
+          .getAdminConfigData(getSessionToken());
+      }
+    }
+
+    function loadAdminAudit() {
+      if (adminState.auditLoading) return;
+      adminState.auditLoading = true;
+      setAdminLoading(true);
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            adminState.auditLoading = false;
+            setAdminLoading(false);
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Lỗi tải nhật ký', res && res.message ? res.message : 'Không tải được nhật ký.', 'error');
+              return;
+            }
+            adminState.auditLoaded = true;
+            adminState.data.audit = Array.isArray(res.data) ? res.data : [];
+            renderAdminTable();
+          })
+          .withFailureHandler(err => {
+            adminState.auditLoading = false;
+            setAdminLoading(false);
+            Swal.fire('Lỗi kết nối', err && err.message ? err.message : String(err || 'Apps Script error'), 'error');
+          })
+          .getAuditLog(getSessionToken(), 500);
+      }
+    }
+
+    function setAdminLoading(isLoading) {
+      document.getElementById('admin-loading').classList.toggle('hidden', !isLoading);
+      document.getElementById('admin-loading').classList.toggle('flex', isLoading);
+      document.getElementById('admin-table-wrap').classList.toggle('hidden', isLoading);
+      document.getElementById('btn-admin-refresh').disabled = isLoading;
+      document.getElementById('btn-admin-refresh').classList.toggle('opacity-60', isLoading);
+    }
+
+    function renderAdminAll() {
+      renderAdminStats();
+      renderAdminFormMode();
+      renderAdminTable();
+      bindAdminAccessSearch();
+    }
+
+    function bindAdminAccessSearch() {
+      const input = document.getElementById('admin-access-search');
+      if (!input || input.dataset.bound === 'true') return;
+      input.dataset.bound = 'true';
+      input.addEventListener('input', renderAdminAccessPicker);
+    }
+
+    function renderAdminStats() {
+      document.getElementById('admin-stat-users').innerText = (adminState.data.users || []).length;
+      document.getElementById('admin-stat-departments').innerText = (adminState.data.departments || []).length;
+      document.getElementById('admin-stat-phongs').innerText = (adminState.data.phongs || []).length;
+      document.getElementById('admin-stat-assignments').innerText = (adminState.data.assignments || []).length;
+    }
+
+    function renderAdminAccessDebug(data) {
+      const box = document.getElementById('admin-debug-result');
+      const access = data.access || {};
+      const criteria = data.criteria || null;
+      const ok = !!(access.canSaveByScope && (!criteria || Number(criteria.allowedItems || 0) > 0));
+      const badge = ok
+        ? '<span class="inline-flex items-center px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 font-black">ĐƯỢC CẬP NHẬT</span>'
+        : '<span class="inline-flex items-center px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 font-black">CHƯA ĐƯỢC CẬP NHẬT</span>';
+      const assignedPhongs = (access.assignedPhongs || []).join(', ') || '--';
+      const assignedDepartments = (access.assignedDepartments || []).join(', ') || '--';
+      const itemPhongs = criteria ? ((criteria.itemPhongs || []).join(', ') || '--') : '--';
+      const reasons = (data.reasons || []).length
+        ? '<ul class="mt-2 list-disc pl-5 text-rose-700">' + data.reasons.map(reason => '<li>' + escapeAdminHtml(reason) + '</li>').join('') + '</ul>'
+        : '<div class="mt-2 text-emerald-700">Không phát hiện điểm chặn quyền rõ ràng.</div>';
+
+      box.classList.remove('hidden');
+      box.innerHTML =
+        '<div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">' +
+          '<div class="text-[13px] font-black text-slate-800">' + escapeAdminHtml(data.user.name || data.user.username) + ' · ' + escapeAdminHtml(data.user.role || '--') + '</div>' +
+          badge +
+        '</div>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Khoa</div><div>' + (access.hasKhoaAccess ? 'Có quyền' : 'Không có quyền') + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Phòng</div><div>' + (access.hasPhongAccess ? 'Có quyền' : 'Không có quyền') + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Tiểu mục khớp</div><div>' + (criteria ? Number(criteria.matchedItems || 0) : '--') + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Tiểu mục được lưu</div><div>' + (criteria ? Number(criteria.allowedItems || 0) : '--') + '</div></div>' +
+        '</div>' +
+        '<div class="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Phòng được giao</div><div class="break-words">' + escapeAdminHtml(assignedPhongs) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Phòng trong tiêu chí</div><div class="break-words">' + escapeAdminHtml(itemPhongs) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Khoa được giao</div><div class="break-words">' + escapeAdminHtml(assignedDepartments) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Phiếu mẫu</div><div class="break-words">' + escapeAdminHtml(criteria && criteria.sample ? ((criteria.sample.id_ketqua || '') + ' / ' + (criteria.sample.magop || '') + ' / ' + (criteria.sample.rowNguoiCham || '')) : '--') + '</div></div>' +
+        '</div>' +
+        reasons;
+    }
+
+    function runAdminAccessDebug() {
+      const btn = document.getElementById('btn-admin-debug');
+      const originalHTML = btn.innerHTML;
+      const payload = {
+        username: document.getElementById('admin-debug-user').value.trim(),
+        khoa: document.getElementById('admin-debug-khoa').value.trim(),
+        phong: document.getElementById('admin-debug-phong').value.trim(),
+        criteria: document.getElementById('admin-debug-criteria').value.trim(),
+        role: 'DoanKT'
+      };
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> Đang kiểm...';
+
+      google.script.run
+        .withSuccessHandler(res => {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            Swal.fire('Không kiểm được quyền', res && res.message ? res.message : 'Vui lòng kiểm tra dữ liệu nhập.', 'error');
+            return;
+          }
+          renderAdminAccessDebug(res.data);
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+          Swal.fire('Lỗi kết nối', err && err.message ? err.message : String(err || 'Apps Script error'), 'error');
+        })
+        .debugAdminUserAccess(getSessionToken(), payload);
+    }
+
+    function switchAdminTab(tab) {
+      adminState.activeTab = tab;
+      document.querySelectorAll('.admin-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-admin-tab') === tab);
+      });
+      const searchInput = document.getElementById('admin-search');
+      if (searchInput) searchInput.value = '';
+      if (tab === 'system') {
+        renderAdminFormMode();
+        return;
+      }
+      if (tab === 'audit') {
+        renderAdminFormMode();
+        if (!adminState.auditLoaded && !adminState.auditLoading) {
+          loadAdminAudit();
+        } else {
+          renderAdminTable();
+        }
+        return;
+      }
+      resetAdminForm();
+      renderAdminTable();
+    }
+
+    function normalizeAdminText(value) {
+      return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+    }
+
+    function escapeAdminHtml(value) {
+      return window.App.utils.escapeHtml(value || '');
+    }
+
+    function renderAdminCell(value, extraClass) {
+      const safeValue = escapeAdminHtml(value || '--');
+      const className = extraClass ? ' ' + extraClass : '';
+      return '<div class="admin-table-cell' + className + '" title="' + safeValue + '">' + safeValue + '</div>';
+    }
+
+    function renderAdminStatus(active) {
+      return active
+        ? '<span class="admin-status-badge is-on">Bật</span>'
+        : '<span class="admin-status-badge is-off">Tắt</span>';
+    }
+
+    function renderAdminActions(row) {
+      return '<div class="admin-row-actions">' +
+        '<button type="button" class="admin-edit-btn admin-row-action-btn admin-row-action-edit" data-row="' + row.rowNumber + '" aria-label="Sửa dòng"><span class="material-symbols-outlined text-[17px]">edit</span></button>' +
+        '<button type="button" class="admin-toggle-btn admin-row-action-btn ' + (row.active ? 'admin-row-action-disable' : 'admin-row-action-enable') + '" data-row="' + row.rowNumber + '" data-active="' + (!row.active) + '" aria-label="' + (row.active ? 'Tắt dòng' : 'Bật dòng') + '"><span class="material-symbols-outlined text-[17px]">' + (row.active ? 'block' : 'check_circle') + '</span></button>' +
+      '</div>';
+    }
+
+    function getAuditActionClass(action) {
+      const text = normalizeAdminText(action);
+      if (text.includes('login_success')) return 'admin-action-login';
+      if (text.includes('logout')) return 'admin-action-logout';
+      if (text.includes('slow')) return 'admin-action-slow';
+      if (text.includes('error') || text.includes('failed')) return 'admin-action-error';
+      if (text.startsWith('admin')) return 'admin-action-admin';
+      return 'admin-action-default';
+    }
+
+    function showAdminAuditDetails(rowNumber) {
+      const row = (adminState.data.audit || []).find(item => Number(item.rowNumber) === Number(rowNumber));
+      if (!row) return;
+      let detailsText = row.detailsText || '{}';
+      try {
+        detailsText = JSON.stringify(row.details || JSON.parse(detailsText), null, 2);
+      } catch (e) {}
+
+      Swal.fire({
+        title: row.action || 'Chi tiết nhật ký',
+        html:
+          '<div class="text-left text-[12px] font-bold text-slate-500 mb-3">' +
+            escapeAdminHtml([row.time, row.actor, row.role, row.target].filter(Boolean).join(' · ')) +
+          '</div>' +
+          '<pre class="admin-audit-json">' + escapeAdminHtml(detailsText || '{}') + '</pre>',
+        width: 760,
+        confirmButtonColor: '#047857',
+        confirmButtonText: 'Đóng',
+        customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold' }
+      });
+    }
+
+    function getAdminRows() {
+      const meta = adminTabMeta[adminState.activeTab];
+      if (!meta || meta.type === 'SYSTEM') return [];
+      const keyword = normalizeAdminText(document.getElementById('admin-search').value);
+      const rows = adminState.data[meta.rows] || [];
+      if (!keyword) return rows;
+      if (adminState.activeTab === 'audit') {
+        return rows.filter(row => normalizeAdminText([row.time, row.actor, row.role, row.action, row.target, row.detailsText].join(' ')).includes(keyword));
+      }
+      return rows.filter(row => normalizeAdminText([row.ma, row.ten, row.giaTri1, row.giaTri2, row.danhSach, row.ghiChu].join(' ')).includes(keyword));
+    }
+
+    function renderAdminTable() {
+      const head = document.getElementById('admin-table-head');
+      const body = document.getElementById('admin-table-body');
+      const empty = document.getElementById('admin-empty');
+      const wrap = document.getElementById('admin-table-wrap');
+      const rows = getAdminRows();
+
+      const tab = adminState.activeTab;
+      const table = wrap.querySelector('table');
+      if (table) {
+        table.classList.toggle('admin-audit-table', tab === 'audit');
+        table.classList.toggle('admin-compact-table', tab !== 'audit');
+      }
+      if (tab === 'settings') {
+        head.innerHTML = '<th class="p-3 border-r border-gray-200 w-52">Mã cài đặt</th><th class="p-3 border-r border-gray-200 w-56">Tên</th><th class="p-3 border-r border-gray-200">Giá trị</th><th class="p-3 border-r border-gray-200 w-24 text-center">Trạng thái</th><th class="p-3 w-32 text-center">Thao tác</th>';
+      } else if (tab === 'users') {
+        head.innerHTML = '<th class="p-3 border-r border-gray-200 w-44">Username</th><th class="p-3 border-r border-gray-200">Họ tên</th><th class="p-3 border-r border-gray-200 w-28">Vai trò</th><th class="p-3 border-r border-gray-200">Quyền</th><th class="p-3 border-r border-gray-200 w-24 text-center">Trạng thái</th><th class="p-3 w-32 text-center">Thao tác</th>';
+      } else if (tab === 'departments') {
+        head.innerHTML = '<th class="p-3 border-r border-gray-200 w-44">Mã khoa</th><th class="p-3 border-r border-gray-200">Tên khoa</th><th class="p-3 border-r border-gray-200 w-24 text-center">Thứ tự</th><th class="p-3 border-r border-gray-200 w-24 text-center">Trạng thái</th><th class="p-3 w-32 text-center">Thao tác</th>';
+      } else if (tab === 'phongs') {
+        head.innerHTML = '<th class="p-3 border-r border-gray-200 w-44">Mã phòng</th><th class="p-3 border-r border-gray-200">Tên hiển thị</th><th class="p-3 border-r border-gray-200 w-24 text-center">Thứ tự</th><th class="p-3 border-r border-gray-200 w-24 text-center">Trạng thái</th><th class="p-3 w-32 text-center">Thao tác</th>';
+      } else if (tab === 'audit') {
+        head.innerHTML = '<th class="w-36">Thời gian</th><th class="w-44">Actor</th><th class="w-24">Role</th><th class="w-44">Action</th><th>Target</th><th class="w-20 text-center">Xem</th>';
+      } else {
+        head.innerHTML = '<th class="p-3 border-r border-gray-200 w-44">Username</th><th class="p-3 border-r border-gray-200">Khoa được giao</th><th class="p-3 border-r border-gray-200 w-44">Phòng</th><th class="p-3 border-r border-gray-200 w-24 text-center">Trạng thái</th><th class="p-3 w-32 text-center">Thao tác</th>';
+      }
+
+      if (!rows.length) {
+        body.innerHTML = '';
+        wrap.classList.add('hidden');
+        empty.classList.remove('hidden');
+        empty.classList.add('flex');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      empty.classList.remove('flex');
+      wrap.classList.remove('hidden');
+
+      body.innerHTML = rows.map(row => {
+        if (tab === 'audit') {
+          const actionClass = getAuditActionClass(row.action || '');
+          return '<tr class="hover:bg-slate-50/70">' +
+            '<td class="border-r border-gray-100 font-bold text-slate-600"><div class="admin-audit-cell">' + escapeAdminHtml(row.time || '--') + '</div></td>' +
+            '<td class="border-r border-gray-100 font-black text-slate-800"><div class="admin-audit-cell">' + escapeAdminHtml(row.actor || '--') + '</div></td>' +
+            '<td class="border-r border-gray-100 font-bold text-slate-500"><div class="admin-audit-cell">' + escapeAdminHtml(row.role || '--') + '</div></td>' +
+            '<td class="border-r border-gray-100"><span class="admin-action-badge ' + actionClass + '">' + escapeAdminHtml(row.action || '--') + '</span></td>' +
+            '<td class="border-r border-gray-100 font-bold text-slate-700"><div class="admin-audit-cell">' + escapeAdminHtml(row.target || '--') + '</div></td>' +
+            '<td class="text-center"><button type="button" class="admin-audit-detail-btn" data-row="' + row.rowNumber + '" aria-label="Xem chi tiết nhật ký"><span class="material-symbols-outlined text-[17px]">data_object</span></button></td>' +
+          '</tr>';
+        }
+
+        const status = renderAdminStatus(row.active);
+        const actions = renderAdminActions(row);
+
+        if (tab === 'settings') {
+          return '<tr class="hover:bg-slate-50/70">' +
+            '<td class="border-r border-gray-100 font-black text-emerald-700">' + renderAdminCell(row.ma) + '</td>' +
+            '<td class="border-r border-gray-100 font-bold text-slate-700">' + renderAdminCell(row.ten) + '</td>' +
+            '<td class="border-r border-gray-100 font-semibold text-slate-500">' + renderAdminCell(row.giaTri1 || '--') + '</td>' +
+            '<td class="border-r border-gray-100 text-center">' + status + '</td>' +
+            '<td>' + actions + '</td>' +
+          '</tr>';
+        }
+        if (tab === 'users') {
+          return '<tr class="hover:bg-slate-50/70">' +
+            '<td class="border-r border-gray-100 font-black text-slate-800">' + renderAdminCell(row.ma) + '</td>' +
+            '<td class="border-r border-gray-100 font-bold text-slate-700" title="' + escapeAdminHtml(row.hasPassword ? 'Đã có mật khẩu' : 'Chưa có mật khẩu') + '">' + renderAdminCell(row.ten) + '</td>' +
+            '<td class="border-r border-gray-100 font-black text-slate-600">' + renderAdminCell(row.giaTri2) + '</td>' +
+            '<td class="border-r border-gray-100 font-bold text-slate-500">' + renderAdminCell(row.danhSach || '--') + '</td>' +
+            '<td class="border-r border-gray-100 text-center">' + status + '</td>' +
+            '<td>' + actions + '</td>' +
+          '</tr>';
+        }
+        if (tab === 'departments' || tab === 'phongs') {
+          return '<tr class="hover:bg-slate-50/70">' +
+            '<td class="border-r border-gray-100 font-black text-emerald-700">' + renderAdminCell(row.ma) + '</td>' +
+            '<td class="border-r border-gray-100 font-bold text-slate-700">' + renderAdminCell(row.ten) + '</td>' +
+            '<td class="border-r border-gray-100 text-center font-black text-slate-500">' + renderAdminCell(row.thuTu || '0') + '</td>' +
+            '<td class="border-r border-gray-100 text-center">' + status + '</td>' +
+            '<td>' + actions + '</td>' +
+          '</tr>';
+        }
+        return '<tr class="hover:bg-slate-50/70">' +
+          '<td class="border-r border-gray-100 font-black text-slate-800">' + renderAdminCell(row.ma) + '</td>' +
+          '<td class="border-r border-gray-100 font-bold text-slate-700">' + renderAdminCell(row.giaTri1 || row.danhSach || '--') + '</td>' +
+          '<td class="border-r border-gray-100 font-black text-slate-500">' + renderAdminCell(row.giaTri2 || '--') + '</td>' +
+          '<td class="border-r border-gray-100 text-center">' + status + '</td>' +
+          '<td>' + actions + '</td>' +
+        '</tr>';
+      }).join('');
+
+      body.querySelectorAll('.admin-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editAdminRow(Number(btn.getAttribute('data-row'))));
+      });
+      body.querySelectorAll('.admin-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => toggleAdminRow(Number(btn.getAttribute('data-row')), btn.getAttribute('data-active') === 'true'));
+      });
+      body.querySelectorAll('.admin-audit-detail-btn').forEach(btn => {
+        btn.addEventListener('click', () => showAdminAuditDetails(Number(btn.getAttribute('data-row'))));
+      });
+    }
+
+    function renderAdminFormMode() {
+      const meta = adminTabMeta[adminState.activeTab];
+      const isAudit = meta.type === 'AUDIT';
+      const isSystem = meta.type === 'SYSTEM';
+      document.getElementById('admin-system-panel').classList.toggle('hidden', !isSystem);
+      document.getElementById('admin-layout').style.display = isSystem ? 'none' : 'grid';
+      document.getElementById('admin-layout').style.gridTemplateColumns = isAudit ? '1fr' : '';
+      document.getElementById('admin-form-panel').style.display = (isAudit || isSystem) ? 'none' : '';
+      document.getElementById('btn-admin-create').style.display = (isAudit || isSystem) ? 'none' : 'flex';
+      document.getElementById('btn-admin-sync').style.display = isAudit ? 'none' : 'flex';
+      if (isAudit || isSystem) return;
+
+      document.getElementById('admin-row-type').value = meta.type;
+      document.getElementById('admin-form-title').innerText = document.getElementById('admin-row-number').value ? 'Sửa cấu hình' : meta.title;
+
+      const isApp = meta.type === 'APP';
+      const isUser = meta.type === 'USER';
+      const isAssignment = meta.type === 'PHANCONG';
+      const useDepartmentPicker = isUser || isAssignment;
+      document.getElementById('admin-field-password').style.display = isUser ? 'block' : 'none';
+      document.getElementById('admin-field-role').style.display = isUser ? 'block' : 'none';
+      document.getElementById('admin-field-access').style.display = (isApp || isUser || isAssignment) ? 'block' : 'none';
+      document.getElementById('admin-field-phong').style.display = isAssignment ? 'block' : 'none';
+      document.getElementById('admin-label-ma').innerText = isApp ? 'Mã cài đặt' : (isUser || isAssignment ? 'Username' : (meta.type === 'KHOA' ? 'Mã khoa' : 'Mã phòng'));
+      document.getElementById('admin-label-ten').innerText = isApp ? 'Tên cài đặt' : (isAssignment ? 'Tên gợi nhớ' : 'Tên hiển thị');
+      document.querySelector('#admin-field-access .admin-label').innerText = isApp ? 'Giá trị cấu hình' : 'Khoa được đánh giá / truy cập';
+      document.getElementById('admin-access').placeholder = isApp ? 'vd: 2026 hoặc URL logo hoặc tiêu đề báo cáo' : 'Danh sách khoa được chọn';
+      document.getElementById('admin-access').style.display = useDepartmentPicker ? 'none' : '';
+      document.getElementById('admin-access-picker').classList.toggle('hidden', !useDepartmentPicker);
+      renderAdminAccessPicker();
+      document.getElementById('admin-ma').placeholder = isApp ? 'vd: report_year' : (isUser || isAssignment ? 'vd: nguyenvana' : (meta.type === 'KHOA' ? 'vd: KCC' : 'vd: QLCL'));
+    }
+
+    function resetAdminForm() {
+      document.getElementById('admin-row-number').value = '';
+      document.getElementById('admin-row-type').value = adminTabMeta[adminState.activeTab].type;
+      ['admin-ma', 'admin-ten', 'admin-password', 'admin-access', 'admin-phong', 'admin-order', 'admin-note'].forEach(id => document.getElementById(id).value = '');
+      if (document.getElementById('admin-access-search')) document.getElementById('admin-access-search').value = '';
+      setAdminRoleValues(['DoanKT']);
+      document.getElementById('admin-active').value = 'true';
+      renderAdminFormMode();
+    }
+
+    function getAdminRoleValues() {
+      const select = document.getElementById('admin-role');
+      return Array.from(select.selectedOptions).map(option => option.value);
+    }
+
+    function setAdminRoleValues(values) {
+      const selected = String(Array.isArray(values) ? values.join(',') : (values || 'DoanKT'))
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+      const normalized = selected.length ? selected : ['DoanKT'];
+      const select = document.getElementById('admin-role');
+      Array.from(select.options).forEach(option => {
+        option.selected = normalized.includes(option.value);
+      });
+    }
+
+    function getAdminAccessValues() {
+      return String(document.getElementById('admin-access').value || '')
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+    }
+
+    function setAdminAccessValues(values) {
+      const unique = [];
+      const seen = {};
+      (Array.isArray(values) ? values : [])
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .forEach(value => {
+          const key = normalizeAdminText(value);
+          if (!seen[key]) {
+            seen[key] = true;
+            unique.push(value);
+          }
+        });
+      document.getElementById('admin-access').value = unique.join(', ');
+      renderAdminAccessPicker();
+    }
+
+    function getAdminDepartmentOptions() {
+      return (adminState.data.departments || [])
+        .filter(row => row && row.active !== false)
+        .map(row => ({
+          value: String(row.ten || row.ma || '').trim(),
+          code: String(row.ma || '').trim(),
+          label: String(row.ten || row.ma || '').trim()
+        }))
+        .filter(option => option.value)
+        .sort((a, b) => a.label.localeCompare(b.label));
+    }
+
+    function renderAdminAccessPicker() {
+      const picker = document.getElementById('admin-access-picker');
+      if (!picker || picker.classList.contains('hidden')) return;
+
+      const list = document.getElementById('admin-access-list');
+      const count = document.getElementById('admin-access-count');
+      const searchInput = document.getElementById('admin-access-search');
+      const keyword = normalizeAdminText(searchInput ? searchInput.value : '');
+      const selected = getAdminAccessValues();
+      const selectedKeys = {};
+      selected.forEach(value => {
+        selectedKeys[normalizeAdminText(value)] = true;
+      });
+
+      const options = getAdminDepartmentOptions();
+      const filtered = keyword
+        ? options.filter(option => normalizeAdminText([option.label, option.code].join(' ')).includes(keyword))
+        : options;
+
+      count.innerText = selected.length + ' khoa được chọn';
+      list.innerHTML = filtered.length
+        ? filtered.map(option => {
+            const optionKeys = [normalizeAdminText(option.value), normalizeAdminText(option.code)].filter(Boolean);
+            const checked = optionKeys.some(key => selectedKeys[key]) ? ' checked' : '';
+            return '<label class="admin-access-option">' +
+              '<input type="checkbox" class="admin-access-checkbox" value="' + escapeAdminHtml(option.value) + '"' + checked + '>' +
+              '<span>' + escapeAdminHtml(option.label) + (option.code && option.code !== option.label ? '<small>' + escapeAdminHtml(option.code) + '</small>' : '') + '</span>' +
+            '</label>';
+          }).join('')
+        : '<div class="text-[12px] font-bold text-slate-400 px-2 py-3">Không tìm thấy khoa phù hợp.</div>';
+
+      list.querySelectorAll('.admin-access-checkbox').forEach(input => {
+        input.addEventListener('change', () => {
+          const current = getAdminAccessValues();
+          const key = normalizeAdminText(input.value);
+          const option = getAdminDepartmentOptions().find(item => normalizeAdminText(item.value) === key);
+          const codeKey = option ? normalizeAdminText(option.code) : '';
+          const next = input.checked
+            ? current.concat([input.value])
+            : current.filter(value => {
+                const valueKey = normalizeAdminText(value);
+                return valueKey !== key && valueKey !== codeKey;
+              });
+          setAdminAccessValues(next);
+        });
+      });
+    }
+
+    function selectAllAdminAccess() {
+      setAdminAccessValues(getAdminDepartmentOptions().map(option => option.value));
+    }
+
+    function clearAdminAccess() {
+      setAdminAccessValues([]);
+    }
+
+    function startAdminCreate() {
+      resetAdminForm();
+      document.getElementById('admin-ma').focus();
+    }
+
+    function findAdminRow(rowNumber) {
+      const allRows = []
+        .concat(adminState.data.settings || [])
+        .concat(adminState.data.users || [])
+        .concat(adminState.data.departments || [])
+        .concat(adminState.data.phongs || [])
+        .concat(adminState.data.assignments || []);
+      return allRows.find(row => Number(row.rowNumber) === Number(rowNumber));
+    }
+
+    function editAdminRow(rowNumber) {
+      const row = findAdminRow(rowNumber);
+      if (!row) return;
+      const tabByType = { APP: 'settings', USER: 'users', KHOA: 'departments', PHONG: 'phongs', PHANCONG: 'assignments' };
+      if (tabByType[row.loai] && adminState.activeTab !== tabByType[row.loai]) {
+        switchAdminTab(tabByType[row.loai]);
+      }
+
+      document.getElementById('admin-row-number').value = row.rowNumber;
+      document.getElementById('admin-row-type').value = row.loai;
+      document.getElementById('admin-ma').value = row.ma || '';
+      document.getElementById('admin-ten').value = row.ten || '';
+      document.getElementById('admin-password').value = '';
+      if (document.getElementById('admin-access-search')) document.getElementById('admin-access-search').value = '';
+      setAdminRoleValues(row.giaTri2 || 'DoanKT');
+      document.getElementById('admin-access').value = row.loai === 'APP' ? (row.giaTri1 || '') : (row.loai === 'PHANCONG' ? (row.giaTri1 || row.danhSach || '') : (row.danhSach || ''));
+      document.getElementById('admin-phong').value = row.giaTri2 || '';
+      document.getElementById('admin-order').value = row.thuTu || '';
+      document.getElementById('admin-active').value = row.active ? 'true' : 'false';
+      document.getElementById('admin-note').value = row.ghiChu || '';
+      renderAdminFormMode();
+    }
+
+    function getAdminPayloadFromForm() {
+      const type = document.getElementById('admin-row-type').value;
+      const payload = {
+        rowNumber: document.getElementById('admin-row-number').value,
+        loai: type,
+        ma: document.getElementById('admin-ma').value.trim(),
+        ten: document.getElementById('admin-ten').value.trim(),
+        password: document.getElementById('admin-password').value,
+        giaTri2: getAdminRoleValues().join(', '),
+        danhSach: document.getElementById('admin-access').value.trim(),
+        giaTri1: '',
+        thuTu: document.getElementById('admin-order').value,
+        active: document.getElementById('admin-active').value === 'true',
+        ghiChu: document.getElementById('admin-note').value.trim()
+      };
+
+      if (type === 'KHOA' || type === 'PHONG') {
+        payload.giaTri1 = payload.ma;
+      }
+      if (type === 'APP') {
+        payload.giaTri1 = document.getElementById('admin-access').value.trim();
+        payload.giaTri2 = '';
+        payload.danhSach = '';
+      }
+      if (type === 'PHANCONG') {
+        payload.giaTri1 = document.getElementById('admin-access').value.trim();
+        payload.giaTri2 = document.getElementById('admin-phong').value.trim();
+      }
+      return payload;
+    }
+
+    function submitAdminForm() {
+      const btn = document.getElementById('btn-admin-save');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> Đang lưu...';
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Lỗi lưu cấu hình', res && res.message ? res.message : 'Không lưu được cấu hình.', 'error');
+              return;
+            }
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: res.message, showConfirmButton: false, timer: 1800 });
+            resetAdminForm();
+            loadAdminConfig(true);
+          })
+          .withFailureHandler(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            Swal.fire('Lỗi kết nối', err && err.message ? err.message : String(err || 'Apps Script error'), 'error');
+          })
+          .saveAdminConfigRow(getSessionToken(), getAdminPayloadFromForm());
+      }
+    }
+
+    function toggleAdminRow(rowNumber, active) {
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Lỗi cập nhật', res && res.message ? res.message : 'Không cập nhật được trạng thái.', 'error');
+              return;
+            }
+            loadAdminConfig(true);
+          })
+          .setAdminConfigRowActive(getSessionToken(), rowNumber, active);
+      }
+    }
+
+    function syncAdminSettings() {
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Lỗi đồng bộ', res && res.message ? res.message : 'Không đồng bộ được Settings.', 'error');
+              return;
+            }
+            Swal.fire({ title: 'Đã đồng bộ', text: res.message, icon: 'success', confirmButtonColor: '#16a34a' });
+            loadAdminConfig(true);
+          })
+          .syncAdminPhongFromSettings(getSessionToken());
+      }
+    }
+
+    function renderAdminHealthResult(data) {
+      const box = document.getElementById('admin-health-result');
+      const counts = data.configCounts || {};
+      const warnings = data.warnings || [];
+      const settings = data.settings || {};
+      const perf = data.performance || {};
+      const perfRows = Array.isArray(perf.byApi) ? perf.byApi : [];
+      const perfHtml = perfRows.length
+        ? '<div class="mt-3 rounded-xl bg-white border border-slate-200 p-3">' +
+            '<div class="text-slate-400 uppercase text-[10px] font-black mb-2">API cham trong ' + Number(perf.scannedRows || 0) + ' dong audit gan nhat</div>' +
+            perfRows.slice(0, 5).map(row => (
+              '<div class="flex items-center justify-between gap-3 py-1 border-b border-slate-100 last:border-b-0">' +
+                '<span class="font-black text-slate-700 truncate">' + escapeAdminHtml(row.api || '--') + '</span>' +
+                '<span class="text-slate-500 whitespace-nowrap">' + Number(row.count || 0) + ' lan | avg ' + Number(row.avgMs || 0) + 'ms | max ' + Number(row.maxMs || 0) + 'ms</span>' +
+              '</div>'
+            )).join('') +
+          '</div>'
+        : '<div class="mt-3 text-slate-500">Chua co log API cham trong mau audit gan nhat.</div>';
+      const warningHtml = warnings.length
+        ? '<ul class="mt-2 list-disc pl-5 text-amber-700">' + warnings.map(item => '<li>' + escapeAdminHtml(item) + '</li>').join('') + '</ul>'
+        : '<div class="mt-2 text-emerald-700">Không phát hiện cảnh báo cấu hình rõ ràng.</div>';
+
+      box.classList.remove('hidden');
+      box.innerHTML =
+        '<div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">' +
+          '<div class="text-[13px] font-black text-slate-800">Health check · ' + escapeAdminHtml(data.checkedAt || '') + '</div>' +
+          (warnings.length ? '<span class="inline-flex items-center px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100 font-black">Cần xem lại</span>' : '<span class="inline-flex items-center px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 font-black">Ổn định</span>') +
+        '</div>' +
+        '<div class="grid grid-cols-2 xl:grid-cols-5 gap-3">' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">APP</div><div>' + Number(counts.APP || 0) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">User</div><div>' + Number(counts.USER || 0) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Khoa</div><div>' + Number(counts.KHOA || 0) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Phòng</div><div>' + Number(counts.PHONG || 0) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Phân công</div><div>' + Number(counts.PHANCONG || 0) + '</div></div>' +
+        '</div>' +
+        '<div class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Data_JSON</div><div>' + Number(data.dataRows || 0) + ' dòng</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Audit</div><div>' + Number(data.auditRows || 0) + ' dòng</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Settings</div><div>' + (settings.ok ? escapeAdminHtml(settings.sheetName || '--') : 'Chưa đạt') + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Tiêu chí Settings</div><div>' + (settings.ok ? Number(settings.soTieuChi || 0) : '--') + '</div></div>' +
+        '</div>' +
+        '<div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">API slow</div><div>' + Number(perf.totalSlow || 0) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">API error</div><div>' + Number(perf.totalError || 0) + '</div></div>' +
+          '<div><div class="text-slate-400 uppercase text-[10px] font-black">Dashboard cache</div><div>' + Number(data.dashboardCacheTtlSeconds || 0) + 's</div></div>' +
+        '</div>' +
+        perfHtml +
+        warningHtml;
+    }
+
+    function runAdminHealthCheck() {
+      const btn = document.getElementById('btn-admin-health');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> Đang kiểm...';
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Không kiểm tra được hệ thống', res && res.message ? res.message : 'Vui lòng thử lại.', 'error');
+              return;
+            }
+            renderAdminHealthResult(res.data || {});
+          })
+          .withFailureHandler(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            Swal.fire('Lỗi kết nối', err && err.message ? err.message : String(err || 'Apps Script error'), 'error');
+          })
+          .getAdminHealthCheck(getSessionToken());
+      }
+    }
+
+    function clearAdminCache() {
+      const btn = document.getElementById('btn-admin-cache');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> Đang làm mới...';
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Không clear được cache', res && res.message ? res.message : 'Vui lòng thử lại.', 'error');
+              return;
+            }
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: res.message, showConfirmButton: false, timer: 2200 });
+            loadAdminConfig(true);
+          })
+          .withFailureHandler(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            Swal.fire('Lỗi kết nối', err && err.message ? err.message : String(err || 'Apps Script error'), 'error');
+          })
+          .clearAdminRuntimeCache(getSessionToken());
+      }
+    }
+  </script>

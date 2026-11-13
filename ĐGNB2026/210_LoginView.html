@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>&#272;&#259;ng nh&#7853;p - 83 Ti&#234;u ch&#237;</title>
+  <meta name="theme-color" content="#f6f7f4">
+  <meta name="description" content="&#272;&#259;ng nh&#7853;p h&#7879; th&#7889;ng ch&#7845;m &#273;i&#7875;m v&#224; theo d&#245;i ch&#7845;t l&#432;&#7907;ng b&#7879;nh vi&#7879;n.">
+  <?!= include('102_Fonts'); ?>
+  <?!= include('100_Tailwind'); ?>
+  <?!= include('101_SweetAlert'); ?>
+
+  <style>
+    :root {
+      --login-bg: #f6f7f4;
+      --login-ink: #17231d;
+      --login-muted: #65756b;
+      --login-line: #dfe7df;
+      --login-accent: #2f7d57;
+      --login-accent-dark: #236845;
+      --login-warm: #8a6a3d;
+      --login-danger: #b94a48;
+      --login-shadow: 0 26px 70px rgba(38, 66, 48, 0.14);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--login-ink);
+      font-family: 'Comfortaa', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+      background:
+        radial-gradient(circle at 12% 12%, rgba(47, 125, 87, 0.16), transparent 26rem),
+        radial-gradient(circle at 88% 8%, rgba(138, 106, 61, 0.12), transparent 24rem),
+        linear-gradient(135deg, #f8faf5 0%, var(--login-bg) 46%, #eef3ee 100%);
+      -webkit-tap-highlight-color: transparent;
+      font-variant-numeric: tabular-nums;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.26;
+      background-image:
+        linear-gradient(rgba(23, 35, 29, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 35, 29, 0.03) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(to bottom, black, transparent 82%);
+    }
+    input, button { font-family: inherit !important; letter-spacing: 0; }
+    .login-shell {
+      width: 100%;
+      min-height: 100dvh;
+      padding: clamp(18px, 3vw, 42px);
+      display: grid;
+      place-items: center;
+      position: relative;
+      z-index: 1;
+    }
+    .login-frame {
+      width: min(1080px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.72fr);
+      gap: clamp(18px, 3vw, 36px);
+      align-items: stretch;
+    }
+    .login-story,
+    .login-card {
+      border: 1px solid rgba(223, 231, 223, 0.92);
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--login-shadow);
+    }
+    .login-story {
+      min-height: 560px;
+      border-radius: 28px;
+      padding: clamp(26px, 4vw, 46px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
+    }
+    .login-story::after {
+      content: "";
+      position: absolute;
+      right: -18%;
+      bottom: -24%;
+      width: 58%;
+      aspect-ratio: 1;
+      border-radius: 34% 66% 44% 56%;
+      background: radial-gradient(circle, rgba(47, 125, 87, 0.16), transparent 68%);
+    }
+    .brand-mark {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      color: var(--login-accent-dark);
+      background: #e6f2ea;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.86), 0 14px 32px rgba(47,125,87,0.16);
+    }
+    .brand-mark img {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+    }
+    .login-mobile-brand {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(223, 231, 223, 0.8);
+    }
+    .login-mobile-brand .brand-mark {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      flex: 0 0 auto;
+    }
+    .login-mobile-brand .brand-mark img {
+      width: 36px;
+      height: 36px;
+    }
+    .login-mobile-brand strong {
+      display: block;
+      color: var(--login-ink);
+      font-size: 15px;
+      line-height: 1.2;
+      font-weight: 900;
+    }
+    .login-mobile-brand span {
+      display: block;
+      margin-top: 3px;
+      color: var(--login-muted);
+      font-size: 11px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+    .eyebrow {
+      margin-top: 28px;
+      color: var(--login-muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .login-title {
+      max-width: 680px;
+      margin-top: 14px;
+      font-size: clamp(34px, 5vw, 62px);
+      line-height: 0.96;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-wrap: balance;
+    }
+    .login-copy {
+      max-width: 560px;
+      margin-top: 20px;
+      color: var(--login-muted);
+      font-size: 16px;
+      line-height: 1.75;
+      font-weight: 600;
+      text-wrap: pretty;
+    }
+    .login-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 34px;
+      position: relative;
+      z-index: 1;
+    }
+    .stat-tile {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(246, 247, 244, 0.78);
+      border: 1px solid rgba(223, 231, 223, 0.86);
+    }
+    .stat-tile strong { display: block; font-size: 24px; font-weight: 900; line-height: 1; }
+    .stat-tile span { display: block; margin-top: 7px; color: var(--login-muted); font-size: 12px; font-weight: 700; }
+    .login-card {
+      border-radius: 24px;
+      padding: clamp(24px, 3vw, 34px);
+      align-self: center;
+    }
+    .card-heading { margin-bottom: 26px; }
+    .card-heading h1 { font-size: 28px; line-height: 1.08; font-weight: 900; letter-spacing: 0; }
+    .card-heading p { margin-top: 8px; color: var(--login-muted); font-size: 14px; font-weight: 600; }
+    .field { margin-bottom: 18px; }
+    .field label { display: block; margin: 0 0 8px 2px; color: #425248; font-size: 13px; font-weight: 800; }
+    .input-wrap { position: relative; }
+    .input-wrap .material-symbols-outlined {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #8a9a90;
+      font-size: 21px;
+    }
+    .login-input {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid var(--login-line);
+      border-radius: 16px;
+      background: rgba(248, 250, 247, 0.82);
+      padding: 0 15px 0 48px;
+      color: var(--login-ink);
+      font-size: 15px;
+      font-weight: 700;
+      outline: none;
+      transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease, transform 220ms ease;
+    }
+    .input-wrap.has-action .login-input { padding-right: 50px; }
+    .login-input:focus {
+      background: white;
+      border-color: rgba(47, 125, 87, 0.65);
+      box-shadow: 0 0 0 4px rgba(47, 125, 87, 0.12);
+    }
+    .login-input[aria-invalid="true"] {
+      border-color: rgba(185, 74, 72, 0.72);
+      background: rgba(255, 248, 247, 0.9);
+    }
+    .field-error {
+      min-height: 16px;
+      margin: 6px 0 0 2px;
+      color: var(--login-danger);
+      font-size: 11.5px;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+    .password-toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      color: #718178;
+      background: transparent;
+      cursor: pointer;
+      transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+    }
+    .password-toggle:hover { background: rgba(47, 125, 87, 0.08); color: var(--login-accent-dark); }
+    .password-toggle:active { transform: translateY(-50%) scale(0.96); }
+    .password-toggle .material-symbols-outlined {
+      position: static;
+      transform: none;
+      font-size: 21px;
+    }
+    .login-button {
+      width: 100%;
+      min-height: 56px;
+      margin-top: 6px;
+      border: 0;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--login-accent) 0%, var(--login-accent-dark) 100%);
+      color: white;
+      font-size: 15px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      cursor: pointer;
+      box-shadow: 0 16px 34px rgba(47, 125, 87, 0.24);
+      transition: transform 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+    }
+    .login-button:hover { filter: saturate(0.96) brightness(1.02); box-shadow: 0 18px 38px rgba(47, 125, 87, 0.30); }
+    .login-button:active { transform: translateY(1px) scale(0.99); }
+    .login-button:focus-visible, .role-choice-btn:focus-visible, .login-input:focus-visible, .password-toggle:focus-visible { outline: 3px solid rgba(47, 125, 87, 0.2); outline-offset: 2px; }
+    .login-button:disabled { opacity: 0.72; cursor: wait; }
+    .login-status {
+      min-height: 18px;
+      margin-top: 12px;
+      color: var(--login-muted);
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 800;
+      text-align: center;
+    }
+    .login-status[data-state="error"] { color: var(--login-danger); }
+    .login-status[data-state="success"] { color: var(--login-accent-dark); }
+    .login-footer { margin-top: 20px; color: #8a9a90; font-size: 12px; font-weight: 700; text-align: center; }
+    .role-panel {
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid rgba(223, 231, 223, 0.92);
+      border-radius: 18px;
+      background: rgba(248, 250, 247, 0.82);
+    }
+    .role-panel.hidden { display: none; }
+    .role-panel-title {
+      margin: 0 0 10px;
+      color: var(--login-ink);
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .role-panel-actions {
+      display: grid;
+      gap: 10px;
+    }
+    .role-choice-btn {
+      width: 100%;
+      padding: 14px 15px;
+      border: 1px solid rgba(223, 231, 223, 0.92);
+      border-radius: 16px !important;
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--login-ink);
+      text-align: left;
+      transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    }
+    .role-choice-btn:hover {
+      border-color: rgba(47, 125, 87, 0.32);
+      background: #f7fbf8;
+      box-shadow: 0 10px 24px rgba(47, 125, 87, 0.10);
+      transform: translateY(-1px);
+    }
+    .role-choice-title { color: var(--login-ink); font-size: 14px; font-weight: 900; }
+    .role-choice-desc { margin-top: 4px; color: var(--login-muted); font-size: 12px; line-height: 1.45; font-weight: 700; }
+    .role-cancel-btn {
+      margin-top: 10px;
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid rgba(185, 74, 72, 0.18);
+      border-radius: 14px;
+      color: var(--login-danger);
+      background: rgba(255, 248, 247, 0.86);
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    @media (max-width: 1023px) {
+      .login-frame {
+        grid-template-columns: minmax(0, 430px);
+        justify-content: center;
+      }
+      .login-story { display: none; }
+      .login-mobile-brand { display: flex; }
+    }
+    @media (max-width: 860px) {
+      .login-shell { align-items: center; padding: 14px; }
+      .login-frame { grid-template-columns: 1fr; }
+      .login-copy { font-size: 14px; line-height: 1.65; }
+      .login-stats { grid-template-columns: 1fr; margin-top: 22px; }
+      .login-card { padding: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="login-shell">
+    <section class="login-frame" aria-label="&#272;&#259;ng nh&#7853;p h&#7879; th&#7889;ng">
+      <div class="login-story">
+        <div>
+          <div class="brand-mark" aria-hidden="true">
+            <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhQqL80XzkD6LL4vftRz2W9TiLyWuFSE8dVNQE-OoLikLZ6osupFjvcQHDPrhnnHgkt6E8fvBi8D7BkKcb5IZp9PTjvtqHEnv3nuh-O3eKh7xZkiwpXRoxv5DxF9aY8A0hqsEcSLnLnRZluDvrYIA1MXEPZ3geJs49lGtPatOib-bSMXPHh6svaRB7hGeM8/s1600/apple-touch-icon-96x96.png" alt="">
+          </div>
+          <div class="eyebrow">B&#7843;ng ki&#7875;m ch&#7845;t l&#432;&#7907;ng</div>
+          <h1 class="login-title">Theo d&#245;i &#273;&#225;nh gi&#225; n&#7897;i b&#7897; r&#245; r&#224;ng h&#417;n.</h1>
+          <p class="login-copy">Ch&#7845;m &#273;i&#7875;m 83 ti&#234;u ch&#237;, t&#7893;ng h&#7907;p ti&#7871;n &#273;&#7897; v&#224; l&#224;m vi&#7879;c theo &#273;&#250;ng vai tr&#242; trong m&#7897;t giao di&#7879;n g&#7885;n, &#237;t nhi&#7877;u.</p>
+        </div>
+        <div class="login-stats" aria-hidden="true">
+          <div class="stat-tile"><strong>83</strong><span>ti&#234;u ch&#237; b&#7879;nh vi&#7879;n</span></div>
+          <div class="stat-tile"><strong>2429</strong><span>b&#7843;ng ki&#7875;m x&#233;t nghi&#7879;m</span></div>
+          <div class="stat-tile"><strong>4</strong><span>nh&#243;m quy&#7873;n l&#224;m vi&#7879;c</span></div>
+        </div>
+      </div>
+
+      <form class="login-card" onsubmit="handleLogin(); return false;">
+        <div class="login-mobile-brand">
+          <div class="brand-mark" aria-hidden="true">
+            <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhQqL80XzkD6LL4vftRz2W9TiLyWuFSE8dVNQE-OoLikLZ6osupFjvcQHDPrhnnHgkt6E8fvBi8D7BkKcb5IZp9PTjvtqHEnv3nuh-O3eKh7xZkiwpXRoxv5DxF9aY8A0hqsEcSLnLnRZluDvrYIA1MXEPZ3geJs49lGtPatOib-bSMXPHh6svaRB7hGeM8/s1600/apple-touch-icon-96x96.png" alt="">
+          </div>
+          <div>
+            <strong>83 Ti&#234;u ch&#237;</strong>
+            <span>H&#7879; th&#7889;ng &#273;&#225;nh gi&#225; ch&#7845;t l&#432;&#7907;ng b&#7879;nh vi&#7879;n</span>
+          </div>
+        </div>
+
+        <div class="card-heading">
+          <h1>&#272;&#259;ng nh&#7853;p</h1>
+          <p>Nh&#7853;p t&#224;i kho&#7843;n &#273;&#227; &#273;&#432;&#7907;c c&#7845;p trong sheet c&#7845;u h&#236;nh.</p>
+        </div>
+
+        <div class="field">
+          <label for="login-username">H&#7885; t&#234;n</label>
+          <div class="input-wrap">
+            <span class="material-symbols-outlined" aria-hidden="true">person</span>
+            <input type="text" id="login-username" class="login-input" autocomplete="username" placeholder="Nh&#7853;p t&#224;i kho&#7843;n" aria-describedby="login-username-error">
+          </div>
+          <div class="field-error" id="login-username-error" aria-live="polite"></div>
+        </div>
+
+        <div class="field">
+          <label for="login-password">M&#7853;t kh&#7849;u</label>
+          <div class="input-wrap has-action">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            <input type="password" id="login-password" class="login-input" autocomplete="current-password" placeholder="Nh&#7853;p m&#7853;t kh&#7849;u" aria-describedby="login-password-error">
+            <button type="button" class="password-toggle" onclick="togglePasswordVisibility()" aria-label="Hi&#7879;n m&#7853;t kh&#7849;u" aria-pressed="false" id="password-toggle-btn">
+              <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            </button>
+          </div>
+          <div class="field-error" id="login-password-error" aria-live="polite"></div>
+        </div>
+
+        <button type="submit" id="btn-login" class="login-button" aria-busy="false">
+          <span>&#272;&#259;ng nh&#7853;p</span>
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">login</span>
+        </button>
+
+        <div class="login-status" id="login-status" aria-live="polite"></div>
+
+        <div class="role-panel hidden" id="role-selection-panel" aria-live="polite">
+          <p class="role-panel-title">Ch&#7885;n vai tr&#242; l&#224;m vi&#7879;c</p>
+          <div class="role-panel-actions" id="role-selection-actions"></div>
+          <button type="button" class="role-cancel-btn" id="role-selection-cancel">H&#7911;y v&#224; nh&#7853;p l&#7841;i</button>
+        </div>
+
+        <div class="login-footer">Phi&#234;n b&#7843;n 3.0 &copy; 2026</div>
+      </form>
+    </section>
+  </main>
+
+  <?!= include('110_UI_Runtime'); ?>
+  <?!= include('211_Controller_Login'); ?>
+</body>
+</html>

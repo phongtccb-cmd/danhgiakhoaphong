@@ -1,0 +1,699 @@
+<!-- 321_Controller_Evidence.html: client-side behavior for 320_EvidenceView.html. -->
+<script>
+    let evidenceInitialized = false;
+    let evidenceItems = [];
+    let evidenceUploadTarget = null;
+    let evidenceLastStats = null;
+    let evidenceCurrentPage = 1;
+    let evidencePageSize = 10;
+    const EVIDENCE_CLIENT_CACHE_TTL_MS = 45000;
+    const evidenceClientCache = {};
+    const EVIDENCE_DEFAULT_PHONG = 'CĐT & ĐT';
+
+    function evidenceEscape(value) {
+      return window.App.utils.escapeHtml(value);
+    }
+
+    function evidenceNormalize(value) {
+      return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    }
+
+    function getEvidenceClientCacheKey() {
+      const userKey = currentUser && currentUser.username ? currentUser.username : 'guest';
+      return [
+        userKey,
+        evidenceNormalize(getEvidenceSelectedKhoa()),
+        evidenceNormalize(getEvidenceSelectedPhong())
+      ].join('|');
+    }
+
+    function getFreshEvidenceClientCache() {
+      const entry = evidenceClientCache[getEvidenceClientCacheKey()];
+      if (!entry || !entry.data || Date.now() - entry.cachedAtMs > EVIDENCE_CLIENT_CACHE_TTL_MS) return null;
+      return entry.data;
+    }
+
+    function setEvidenceClientCache(items, stats) {
+      evidenceClientCache[getEvidenceClientCacheKey()] = {
+        data: {
+          items: items || [],
+          stats: stats || null
+        },
+        cachedAtMs: Date.now()
+      };
+    }
+
+    function invalidateEvidenceClientCache() {
+      delete evidenceClientCache[getEvidenceClientCacheKey()];
+    }
+
+    function evidenceStatusLabel(status) {
+      const map = {
+        missing: 'Chưa có',
+        draft: 'Chưa rà soát',
+        need_update: 'Cần bổ sung',
+        reviewed: 'Đã rà soát',
+        unused: 'Không sử dụng'
+      };
+      return map[status] || 'Chưa rà soát';
+    }
+
+    function evidenceStatusBadge(status) {
+      const safeStatus = ['missing', 'draft', 'need_update', 'reviewed', 'unused'].includes(status) ? status : 'draft';
+      return '<span class="evidence-badge ' + safeStatus + '">' + evidenceEscape(evidenceStatusLabel(safeStatus)) + '</span>';
+    }
+
+    function getEvidenceSummary(item) {
+      const text = String(item && item.minhchung_bv || '').trim();
+      const list = Array.isArray(item && item.evidences_bv) ? item.evidences_bv : [];
+      if (list.length > 0) return { label: list.length + ' file', icon: 'cloud_done', kind: 'ready' };
+      if (!text) return { label: 'Chưa có', icon: 'playlist_add', kind: 'missing' };
+      const hasUrl = !!extractEvidenceUrlClient(text);
+      const hasDrive = /drive\.google\.com/i.test(text);
+      const textWithoutUrls = text.replace(/https?:\/\/[^\s"'<>]+/ig, '').replace(/drive\.google\.com\/[^\s"'<>]+/ig, '').trim();
+      if (hasDrive && textWithoutUrls) return { label: 'File + ghi chú', icon: 'cloud_done', kind: 'ready' };
+      if (hasDrive) return { label: 'Link Drive', icon: 'link', kind: 'ready' };
+      if (hasUrl) return { label: 'Có link', icon: 'link', kind: 'ready' };
+      return { label: 'Ghi chú', icon: 'sticky_note_2', kind: 'note' };
+    }
+
+    function evidenceSummaryBadge(item) {
+      const summary = getEvidenceSummary(item);
+      return '<span class="evidence-proof-badge ' + summary.kind + '"><span class="material-symbols-outlined">' + summary.icon + '</span>' + evidenceEscape(summary.label) + '</span>';
+    }
+
+    function formatEvidenceDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function getEvidenceStatsFromItems(items) {
+      return (items || []).reduce((acc, item) => {
+        acc.total++;
+        if (item.hasEvidence) acc.withEvidence++; else acc.missing++;
+        if (item.hasDriveLink) acc.withDriveLink++;
+        const status = item.evidence_status || (item.hasEvidence ? 'draft' : 'missing');
+        acc.byStatus[status] = (acc.byStatus[status] || 0) + 1;
+        return acc;
+      }, { total: 0, withEvidence: 0, missing: 0, withDriveLink: 0, byStatus: {} });
+    }
+
+    function getEvidenceSelectedKhoa() {
+      const el = document.getElementById('evidence-khoa');
+      return el ? el.value : '';
+    }
+
+    function getEvidenceSelectedPhong() {
+      const el = document.getElementById('evidence-phong');
+      return el ? el.value || 'All' : 'All';
+    }
+
+    function initEvidenceUI() {
+      if (evidenceInitialized) {
+        loadEvidenceData(false);
+        return;
+      }
+      evidenceInitialized = true;
+      loadEvidenceKhoaOptions();
+    }
+
+    function loadEvidenceKhoaOptions() {
+      const select = document.getElementById('evidence-khoa');
+      if (!select) return;
+      select.innerHTML = '<option value="">Đang tải...</option>';
+      if (typeof google === 'undefined') return;
+      google.script.run.withSuccessHandler(res => {
+        if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+        if (!res || !res.success) {
+          select.innerHTML = '<option value="">Không tải được khoa</option>';
+          return;
+        }
+        const list = Array.isArray(res.data) ? res.data : [];
+        const preferred = currentConfig && currentConfig.khoa ? currentConfig.khoa : '';
+        select.innerHTML = list.map(khoa => '<option value="' + evidenceEscape(khoa) + '">' + evidenceEscape(khoa) + '</option>').join('');
+        if (preferred && list.some(khoa => evidenceNormalize(khoa) === evidenceNormalize(preferred))) select.value = preferred;
+        if (!select.value && list.length > 0) select.value = list[0];
+        handleEvidenceKhoaChange();
+      }).getDanhSachKhoaTuDepartment(getSessionToken());
+    }
+
+    function handleEvidenceKhoaChange() {
+      const khoa = getEvidenceSelectedKhoa();
+      const phongSelect = document.getElementById('evidence-phong');
+      if (!phongSelect) return;
+      phongSelect.innerHTML = '<option value="">Đang tải...</option>';
+      if (!khoa || typeof google === 'undefined') {
+        loadEvidenceData(true);
+        return;
+      }
+      google.script.run.withSuccessHandler(res => {
+        if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+        const rawOptions = res && res.success && Array.isArray(res.data) ? res.data : [];
+        const options = rawOptions
+          .map(option => ({
+            value: typeof option === 'string' ? option : option.value,
+            label: typeof option === 'string' ? option : (option.label || option.value)
+          }))
+          .filter(option => option.value && !['All', 'Tất cả', 'Tat ca'].some(allValue => evidenceNormalize(option.value) === evidenceNormalize(allValue)));
+
+        let html = '';
+        options.forEach(option => {
+          html += '<option value="' + evidenceEscape(option.value) + '">' + evidenceEscape(option.label) + '</option>';
+        });
+        phongSelect.innerHTML = html || '<option value="All">Tất cả</option>';
+
+        const allOptions = Array.from(phongSelect.options);
+        const defaultOption = allOptions.find(option => evidenceNormalize(option.value) === evidenceNormalize(EVIDENCE_DEFAULT_PHONG));
+        const currentOption = currentConfig && currentConfig.phong
+          ? allOptions.find(option => evidenceNormalize(option.value) === evidenceNormalize(currentConfig.phong))
+          : null;
+
+        if (defaultOption) {
+          phongSelect.value = defaultOption.value;
+        } else if (currentOption) {
+          phongSelect.value = currentOption.value;
+        } else if (phongSelect.options.length > 0) {
+          phongSelect.selectedIndex = 0;
+        }
+
+        evidenceCurrentPage = 1;
+        loadEvidenceData(true);
+      }).getDanhSachPhongPhuTrach(getSessionToken(), khoa);
+    }
+
+    function setEvidenceLoading(isLoading) {
+      document.getElementById('evidence-loading')?.classList.toggle('hidden', !isLoading);
+      document.getElementById('evidence-content')?.classList.toggle('hidden', isLoading);
+      document.getElementById('evidence-empty')?.classList.add('hidden');
+      const btn = document.getElementById('btn-evidence-refresh');
+      if (btn) btn.disabled = isLoading;
+    }
+
+    function loadEvidenceData(force) {
+      const khoa = getEvidenceSelectedKhoa();
+      if (!khoa || typeof google === 'undefined') return;
+      const cachedData = force ? null : getFreshEvidenceClientCache();
+      if (cachedData) {
+        evidenceItems = Array.isArray(cachedData.items) ? cachedData.items : [];
+        evidenceLastStats = cachedData.stats || null;
+        evidenceCurrentPage = 1;
+        renderEvidenceStats(evidenceLastStats);
+        renderEvidenceList();
+        return;
+      }
+      setEvidenceLoading(true);
+      google.script.run.withSuccessHandler(res => {
+        setEvidenceLoading(false);
+        if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+        if (!res || !res.success) {
+          Swal.fire('Không tải được minh chứng', res && res.message ? res.message : 'Vui lòng thử lại.', 'error');
+          evidenceItems = [];
+          renderEvidenceList();
+          return;
+        }
+        evidenceItems = res.data && Array.isArray(res.data.items) ? res.data.items : [];
+        evidenceLastStats = res.data && res.data.stats ? res.data.stats : null;
+        setEvidenceClientCache(evidenceItems, evidenceLastStats);
+        evidenceCurrentPage = 1;
+        renderEvidenceStats(evidenceLastStats);
+        renderEvidenceList();
+      }).getEvidenceManagementData(khoa, getEvidenceSelectedPhong(), getSessionToken());
+    }
+
+    function renderEvidenceStats(stats) {
+      const safeStats = stats || getEvidenceStatsFromItems(evidenceItems);
+      if (!safeStats.byStatus) safeStats.byStatus = getEvidenceStatsFromItems(evidenceItems).byStatus;
+      evidenceLastStats = safeStats;
+      document.getElementById('evidence-stat-total').innerText = safeStats.total || 0;
+      document.getElementById('evidence-stat-ready').innerText = safeStats.withEvidence || 0;
+      document.getElementById('evidence-stat-missing').innerText = Number(safeStats.missing || 0) + Number(safeStats.byStatus.need_update || 0);
+      document.getElementById('evidence-stat-drive').innerText = safeStats.withDriveLink || 0;
+      renderEvidenceStatusTabs(safeStats);
+      renderEvidenceInsight(safeStats);
+    }
+
+    function renderEvidenceStatusTabs(stats) {
+      const safeStats = stats || evidenceLastStats || getEvidenceStatsFromItems(evidenceItems);
+      const byStatus = safeStats.byStatus || {};
+      const counts = {
+        all: safeStats.total || 0,
+        missing: byStatus.missing || 0,
+        draft: byStatus.draft || 0,
+        need_update: byStatus.need_update || 0,
+        reviewed: byStatus.reviewed || 0,
+        unused: byStatus.unused || 0
+      };
+      const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = value;
+      };
+      setText('evidence-tab-all', counts.all);
+      setText('evidence-tab-missing', counts.missing);
+      setText('evidence-tab-draft', counts.draft);
+      setText('evidence-tab-need-update', counts.need_update);
+      setText('evidence-tab-reviewed', counts.reviewed);
+      setText('evidence-tab-unused', counts.unused);
+
+      const activeStatus = document.getElementById('evidence-status')?.value || 'all';
+      document.querySelectorAll('.evidence-status-tab').forEach(button => {
+        button.classList.toggle('active', button.getAttribute('data-status') === activeStatus);
+      });
+    }
+
+    function setEvidenceStatusFilter(status) {
+      const select = document.getElementById('evidence-status');
+      if (select) select.value = status || 'all';
+      evidenceCurrentPage = 1;
+      renderEvidenceStatusTabs();
+      renderEvidenceList();
+    }
+
+    function renderEvidenceInsight(stats) {
+      const total = Number(stats && stats.total || 0);
+      const byStatus = stats && stats.byStatus ? stats.byStatus : {};
+      const reviewed = Number(byStatus.reviewed || 0);
+      const draft = Number(byStatus.draft || 0);
+      const needUpdate = Number(byStatus.need_update || 0);
+      const missing = Number(stats && stats.missing || 0);
+      const priority = missing + needUpdate;
+      const percent = total > 0 ? Math.round((reviewed / total) * 100) : 0;
+
+      const percentEl = document.getElementById('evidence-review-percent');
+      const barEl = document.getElementById('evidence-review-bar');
+      const captionEl = document.getElementById('evidence-insight-caption');
+      if (percentEl) percentEl.innerText = percent + '%';
+      if (barEl) barEl.style.width = percent + '%';
+      if (captionEl) captionEl.innerText = total > 0
+        ? (priority > 0 ? (priority + ' tiểu mục cần xử lý trước') : 'Minh chứng đã sẵn sàng để kiểm tra')
+        : 'Chưa có dữ liệu';
+      document.getElementById('evidence-priority-count').innerText = priority;
+      document.getElementById('evidence-draft-count').innerText = draft;
+      document.getElementById('evidence-reviewed-count').innerText = reviewed;
+    }
+
+    function getFilteredEvidenceItems() {
+      const status = document.getElementById('evidence-status')?.value || 'all';
+      const query = evidenceNormalize(document.getElementById('evidence-query')?.value || '');
+      return evidenceItems.filter(item => {
+        if (status !== 'all' && item.evidence_status !== status) return false;
+        if (!query) return true;
+        const haystack = evidenceNormalize([item.maTC, item.phong, item.noiDungTieuMuc, item.cachCham, item.bangchungGoiY, item.minhchung_bv].join(' '));
+        return haystack.includes(query);
+      });
+    }
+
+    function handleEvidenceSearchInput() {
+      evidenceCurrentPage = 1;
+      renderEvidenceList();
+    }
+
+    function changeEvidencePageSize(value) {
+      evidencePageSize = Number(value || 10) || 10;
+      evidenceCurrentPage = 1;
+      renderEvidenceList();
+    }
+
+    function changeEvidencePage(delta) {
+      evidenceCurrentPage += Number(delta || 0);
+      renderEvidenceList();
+    }
+
+    function updateEvidencePager(total, page, pageSize, pageCount) {
+      const start = total === 0 ? 0 : ((page - 1) * pageSize) + 1;
+      const end = total === 0 ? 0 : Math.min(total, page * pageSize);
+      const summary = document.getElementById('evidence-page-summary');
+      const label = document.getElementById('evidence-page-label');
+      const prev = document.getElementById('evidence-prev-page');
+      const next = document.getElementById('evidence-next-page');
+      const size = document.getElementById('evidence-page-size');
+      if (summary) summary.innerText = 'Hiển thị ' + start + '-' + end + ' trong tổng ' + total + ' tiểu mục';
+      if (label) label.innerText = 'Trang ' + page + ' / ' + pageCount;
+      if (prev) prev.disabled = page <= 1;
+      if (next) next.disabled = page >= pageCount;
+      if (size && Number(size.value) !== pageSize) size.value = String(pageSize);
+    }
+
+    function getMissingEvidenceItemsForExport() {
+      return evidenceItems.filter(item => !item.hasEvidence || item.evidence_status === 'need_update');
+    }
+
+    function exportMissingEvidenceExcel() {
+      const missingItems = getMissingEvidenceItemsForExport();
+      if (missingItems.length === 0) {
+        Swal.fire('Không có danh sách thiếu', 'Tất cả tiểu mục trong phạm vi hiện tại đã có minh chứng và không bị đánh dấu cần bổ sung.', 'success');
+        return;
+      }
+      if (typeof XLSX === 'undefined') {
+        Swal.fire('Chưa tải được thư viện Excel', 'Vui lòng mở lại màn hình Kết quả một lần hoặc tải lại trang rồi thử xuất lại.', 'warning');
+        return;
+      }
+
+      const rows = missingItems.map(item => ({
+        'Khoa': item.khoa || getEvidenceSelectedKhoa(),
+        'Phòng': item.phong || 'All',
+        'Tiêu chí': item.maTC || '',
+        'Mức độ': item.mucdo || '',
+        'Nội dung tiểu mục': item.noiDungTieuMuc || item.noiDungTieuChi || '',
+        'Cách chấm': item.cachCham || '',
+        'Gợi ý bằng chứng': item.bangchungGoiY || '',
+        'Trạng thái': evidenceStatusLabel(item.evidence_status),
+        'Minh chứng hiện có': item.minhchung_bv || '',
+        'Ghi chú rà soát': item.evidence_review_note || '',
+        'Người rà soát': item.evidence_reviewed_by || '',
+        'Ngày rà soát': formatEvidenceDate(item.evidence_reviewed_at)
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 22 }, { wch: 18 }, { wch: 10 }, { wch: 10 },
+        { wch: 55 }, { wch: 45 }, { wch: 38 }, { wch: 16 }, { wch: 42 },
+        { wch: 32 }, { wch: 22 }, { wch: 14 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Thieu_Minh_Chung');
+      const cleanKhoa = String(getEvidenceSelectedKhoa() || 'Tat_ca').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_');
+      const today = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, 'Thieu_Minh_Chung_' + cleanKhoa + '_' + today + '.xlsx');
+    }
+
+    function renderEvidenceList() {
+      const items = getFilteredEvidenceItems();
+      const content = document.getElementById('evidence-content');
+      const empty = document.getElementById('evidence-empty');
+      const body = document.getElementById('evidence-table-body');
+      const mobile = document.getElementById('evidence-mobile-list');
+      if (!body || !mobile) return;
+
+      const total = items.length;
+      const pageSize = evidencePageSize || 10;
+      const pageCount = Math.max(1, Math.ceil(total / pageSize));
+      evidenceCurrentPage = Math.min(Math.max(1, evidenceCurrentPage || 1), pageCount);
+      const startIndex = (evidenceCurrentPage - 1) * pageSize;
+      const pageItems = items.slice(startIndex, startIndex + pageSize);
+      updateEvidencePager(total, evidenceCurrentPage, pageSize, pageCount);
+
+      if (total === 0) {
+        content?.classList.add('hidden');
+        empty?.classList.remove('hidden');
+        body.innerHTML = '';
+        mobile.innerHTML = '';
+        return;
+      }
+
+      content?.classList.remove('hidden');
+      empty?.classList.add('hidden');
+      body.innerHTML = pageItems.map(renderEvidenceRow).join('');
+      mobile.innerHTML = pageItems.map(renderEvidenceMobileCard).join('');
+    }
+
+    function renderEvidenceRow(item) {
+      const key = getEvidenceItemKey(item);
+      return '<tr>' +
+        '<td><div class="evidence-code">' + evidenceEscape(item.maTC || '-') + '</div></td>' +
+        '<td><span class="evidence-level">' + evidenceEscape(formatEvidenceLevel(item.mucdo)) + '</span></td>' +
+        '<td><div class="evidence-title evidence-clamp-2">' + evidenceEscape(item.noiDungTieuMuc || item.noiDungTieuChi || '-') + '</div></td>' +
+        '<td><div class="evidence-hint evidence-clamp-2">' + evidenceEscape(item.cachCham || item.bangchungGoiY || '-') + '</div></td>' +
+        '<td>' + evidenceSummaryBadge(item) + '</td>' +
+        '<td>' + evidenceStatusBadge(item.evidence_status) + '</td>' +
+        '<td><div class="evidence-actions">' +
+          '<button type="button" class="evidence-icon-btn" onclick="showEvidenceDetailByKey(\'' + key + '\')" title="Xem chi tiết"><span class="material-symbols-outlined">visibility</span></button>' +
+          '<button type="button" class="evidence-icon-btn" onclick="editEvidenceByKey(\'' + key + '\')" title="Sửa minh chứng"><span class="material-symbols-outlined">edit_note</span></button>' +
+          '<button type="button" class="evidence-icon-btn" onclick="uploadEvidenceByKey(\'' + key + '\')" title="Tải file"><span class="material-symbols-outlined">upload_file</span></button>' +
+        '</div></td>' +
+      '</tr>';
+    }
+
+    function formatEvidenceLevel(value) {
+      const text = String(value || '').trim();
+      if (!text) return '-';
+      if (/^m[\u1ee9u]c\s+/i.test(text) || /^muc\s+/i.test(text)) return text;
+      return 'Mức ' + text;
+    }
+
+    function renderEvidenceMobileCard(item) {
+      const key = getEvidenceItemKey(item);
+      const reviewerText = item.evidence_reviewed_by
+        ? ('Rà soát: ' + item.evidence_reviewed_by + (formatEvidenceDate(item.evidence_reviewed_at) ? ' · ' + formatEvidenceDate(item.evidence_reviewed_at) : ''))
+        : 'Chưa có người rà soát';
+      return '<article class="evidence-mobile-card">' +
+        '<div class="evidence-mobile-head"><span class="evidence-code">' + evidenceEscape(item.maTC || '-') + ' · ' + evidenceEscape(formatEvidenceLevel(item.mucdo)) + '</span>' + evidenceStatusBadge(item.evidence_status) + '</div>' +
+        '<div class="evidence-mobile-title">' + evidenceEscape(item.noiDungTieuMuc || item.noiDungTieuChi || '-') + '</div>' +
+        '<div class="evidence-mobile-meta">' + evidenceEscape(item.cachCham || item.bangchungGoiY || '') + '</div>' +
+        '<div class="evidence-mobile-meta">' + evidenceEscape(item.phong || 'All') + ' · ' + evidenceEscape(reviewerText) + '</div>' +
+        '<div class="mt-2">' + evidenceSummaryBadge(item) + '</div>' +
+        '<div class="evidence-mobile-actions">' +
+          '<button type="button" class="evidence-icon-btn" onclick="showEvidenceDetailByKey(\'' + key + '\')"><span class="material-symbols-outlined">visibility</span></button>' +
+          '<button type="button" class="evidence-icon-btn" onclick="editEvidenceByKey(\'' + key + '\')"><span class="material-symbols-outlined">edit_note</span></button>' +
+          '<button type="button" class="evidence-icon-btn" onclick="uploadEvidenceByKey(\'' + key + '\')"><span class="material-symbols-outlined">upload_file</span></button>' +
+        '</div>' +
+      '</article>';
+    }
+
+    function getEvidenceItemKey(item) {
+      return btoa(unescape(encodeURIComponent([item.id_ketqua, item.magop, item.itemId].join('|')))).replace(/=+$/g, '');
+    }
+
+    function findEvidenceItemByKey(key) {
+      return evidenceItems.find(item => getEvidenceItemKey(item) === key);
+    }
+
+    function openEvidenceUrlByKey(key) {
+      const item = findEvidenceItemByKey(key);
+      if (!item || !item.evidenceUrl) return;
+      window.open(item.evidenceUrl, '_blank', 'noopener');
+    }
+
+    function showEvidenceDetailByKey(key) {
+      const item = findEvidenceItemByKey(key);
+      if (!item) return;
+      const reviewLine = item.evidence_reviewed_by
+        ? evidenceEscape(item.evidence_reviewed_by) + (formatEvidenceDate(item.evidence_reviewed_at) ? ' · ' + evidenceEscape(formatEvidenceDate(item.evidence_reviewed_at)) : '')
+        : 'Chưa rà soát';
+      const evidenceText = item.minhchung_bv
+        ? evidenceEscape(item.minhchung_bv)
+        : '<span class="text-slate-400 italic">Chưa có minh chứng</span>';
+      const evidenceFiles = Array.isArray(item.evidences_bv) ? item.evidences_bv : [];
+      const evidenceFilesHtml = evidenceFiles.length
+        ? '<section><label>File đính kèm</label><div class="space-y-1">' + evidenceFiles.map(ev =>
+            '<a class="block text-[12px] font-bold text-blue-700 hover:underline break-all" href="' + evidenceEscape(ev.url || '#') + '" target="_blank" rel="noopener">' +
+              evidenceEscape(ev.title || ev.url || 'Minh chứng') +
+            '</a>'
+          ).join('') + '</div></section>'
+        : '';
+      const openButton = item.evidenceUrl
+        ? '<button type="button" id="evidence-detail-open-drive" class="swal2-confirm swal2-styled" style="background:#2f7d57">Mở Drive</button>'
+        : '';
+
+      Swal.fire({
+        title: 'Chi tiết minh chứng',
+        html:
+          '<div class="evidence-detail-popup">' +
+            '<div class="evidence-detail-top">' +
+              '<span>' + evidenceEscape(item.maTC || '-') + '</span>' +
+              evidenceStatusBadge(item.evidence_status) +
+              evidenceSummaryBadge(item) +
+            '</div>' +
+            '<section><label>Nội dung tiểu mục</label><p>' + evidenceEscape(item.noiDungTieuMuc || item.noiDungTieuChi || '-') + '</p></section>' +
+            '<section><label>Cách chấm</label><p>' + evidenceEscape(item.cachCham || '-') + '</p></section>' +
+            '<section><label>Gợi ý bằng chứng</label><p>' + evidenceEscape(item.bangchungGoiY || '-') + '</p></section>' +
+            '<section><label>Minh chứng khoa</label><p class="evidence-detail-evidence">' + evidenceText + '</p></section>' +
+            evidenceFilesHtml +
+            '<section><label>Rà soát</label><p>' + reviewLine + '</p></section>' +
+            (item.evidence_review_note ? '<section><label>Ghi chú rà soát</label><p>' + evidenceEscape(item.evidence_review_note) + '</p></section>' : '') +
+            '<div class="evidence-detail-actions">' + openButton + '</div>' +
+          '</div>',
+        showConfirmButton: true,
+        confirmButtonText: 'Đóng',
+        confirmButtonColor: '#64748b',
+        customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold' },
+        didOpen: () => {
+          const btn = document.getElementById('evidence-detail-open-drive');
+          if (btn) btn.onclick = () => window.open(item.evidenceUrl, '_blank', 'noopener');
+        }
+      });
+    }
+
+    function editEvidenceByKey(key) {
+      const item = findEvidenceItemByKey(key);
+      if (!item) return;
+      Swal.fire({
+        title: 'Cập nhật minh chứng',
+        html:
+          '<div class="text-left space-y-3">' +
+            '<label class="block text-[11px] font-black text-slate-600">Minh chứng khoa</label>' +
+            '<textarea id="evidence-edit-note" class="w-full min-h-[140px] rounded-xl border border-slate-200 bg-slate-50 p-3 text-[12px] font-bold text-slate-800 outline-none focus:border-green-600" placeholder="Nhập ghi chú hoặc link Drive...">' + evidenceEscape(item.minhchung_bv || '') + '</textarea>' +
+            '<label class="block text-[11px] font-black text-slate-600">Trạng thái rà soát</label>' +
+            '<select id="evidence-edit-status" class="w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[12px] font-black text-slate-800 outline-none focus:border-green-600">' +
+              '<option value="draft">Chưa rà soát</option>' +
+              '<option value="need_update">Cần bổ sung</option>' +
+              '<option value="reviewed">Đã rà soát</option>' +
+              '<option value="unused">Không sử dụng</option>' +
+            '</select>' +
+            '<label class="block text-[11px] font-black text-slate-600">Ghi chú rà soát</label>' +
+            '<textarea id="evidence-edit-review" class="w-full min-h-[72px] rounded-xl border border-slate-200 bg-slate-50 p-3 text-[12px] font-bold text-slate-800 outline-none focus:border-green-600" placeholder="Lý do cần bổ sung hoặc ghi chú nội bộ...">' + evidenceEscape(item.evidence_review_note || '') + '</textarea>' +
+          '</div>',
+        didOpen: () => {
+          const status = document.getElementById('evidence-edit-status');
+          if (status) status.value = ['draft', 'need_update', 'reviewed', 'unused'].includes(item.evidence_status) ? item.evidence_status : 'draft';
+        },
+        showCancelButton: true,
+        confirmButtonColor: '#2f7d57',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'Lưu minh chứng',
+        cancelButtonText: 'Hủy',
+        customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold', cancelButton: 'rounded-xl font-bold' },
+        preConfirm: () => ({
+          minhchung_bv: document.getElementById('evidence-edit-note').value,
+          evidence_status: document.getElementById('evidence-edit-status').value,
+          evidence_review_note: document.getElementById('evidence-edit-review').value
+        })
+      }).then(result => {
+        if (result.isConfirmed) saveEvidenceItem(item, result.value);
+      });
+    }
+
+    function saveEvidenceItem(item, payload, done) {
+      if (typeof google === 'undefined') return;
+      google.script.run.withSuccessHandler(res => {
+        if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+        if (!res || !res.success) {
+          Swal.fire('Không lưu được minh chứng', res && res.message ? res.message : 'Vui lòng thử lại.', 'error');
+          if (done) done(false);
+          return;
+        }
+        Object.assign(item, payload);
+        if (res.data) {
+          if (res.data.evidence_reviewed_by !== undefined) item.evidence_reviewed_by = res.data.evidence_reviewed_by;
+          if (res.data.evidence_reviewed_at !== undefined) item.evidence_reviewed_at = res.data.evidence_reviewed_at;
+          if (res.data.evidence_review_note !== undefined) item.evidence_review_note = res.data.evidence_review_note;
+          if (res.data.evidence_status !== undefined) item.evidence_status = res.data.evidence_status;
+        }
+        const evidenceFiles = Array.isArray(item.evidences_bv) ? item.evidences_bv : [];
+        item.hasEvidence = String(item.minhchung_bv || '').trim() !== '' || evidenceFiles.length > 0;
+        item.evidenceUrl = extractEvidenceUrlClient(item.minhchung_bv) || (evidenceFiles[0] && evidenceFiles[0].url ? evidenceFiles[0].url : '');
+        item.hasDriveLink = /drive\.google\.com/i.test([item.evidenceUrl, item.minhchung_bv].concat(evidenceFiles.map(ev => ev.url || '')).join(' '));
+        renderEvidenceStats(null);
+        renderEvidenceList();
+        setEvidenceClientCache(evidenceItems, evidenceLastStats);
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Đã cập nhật minh chứng', showConfirmButton: false, timer: 2200 });
+        if (done) done(true);
+      }).updateEvidenceItem(item.id_ketqua, item.magop, item.itemId, payload, getSessionToken());
+    }
+
+    function extractEvidenceUrlClient(value) {
+      const text = String(value || '').trim();
+      const absolute = text.match(/https?:\/\/[^\s"'<>]+/i);
+      if (absolute) return absolute[0].replace(/[),.;]+$/g, '');
+      const drive = text.match(/(?:^|\s)(drive\.google\.com\/[^\s"'<>]+)/i);
+      return drive ? 'https://' + drive[1].replace(/[),.;]+$/g, '') : '';
+    }
+
+    function uploadEvidenceByKey(key) {
+      const item = findEvidenceItemByKey(key);
+      if (!item) return;
+      evidenceUploadTarget = item;
+      document.getElementById('evidence-file-input').click();
+    }
+
+    function sanitizeEvidenceFilePart(value, fallback) {
+      const text = String(value || '').trim()
+        .replace(/[\\/:*?"<>|]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return (text || fallback || 'Minh_chung').slice(0, 90);
+    }
+
+    function buildEvidenceUploadFileName(item, file) {
+      const originalName = String(file && file.name || 'file').trim();
+      const dotIndex = originalName.lastIndexOf('.');
+      const extension = dotIndex > 0 ? originalName.slice(dotIndex).replace(/[\\/:*?"<>|\s]+/g, '') : '';
+      const code = sanitizeEvidenceFilePart(item && (item.maTC || item.magop), 'TC');
+      const itemId = sanitizeEvidenceFilePart(item && item.itemId, 'TM');
+      const title = sanitizeEvidenceFilePart(item && (item.noiDungTieuMuc || item.noiDungTieuChi), 'Tieu_muc');
+      const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      return [code, itemId, title, stamp].filter(Boolean).join(' - ').slice(0, 160) + extension;
+    }
+
+    function createEvidenceFileRecord(data) {
+      const now = new Date();
+      const rawTitle = data && data.title ? data.title : '';
+      const rawUrl = data && data.url ? data.url : '';
+      const rawNote = data && data.note ? data.note : '';
+      return {
+        id: 'ev_' + now.getTime() + '_' + Math.floor(Math.random() * 100000),
+        title: String(rawTitle || rawUrl || rawNote || 'Minh chứng').trim(),
+        url: String(rawUrl || '').trim(),
+        type: String(data && data.type || (rawUrl ? 'link' : 'note')).trim(),
+        note: String(rawNote || '').trim(),
+        uploadedBy: currentUser && (currentUser.name || currentUser.username) ? (currentUser.name || currentUser.username) : '',
+        uploadedAt: now.toISOString()
+      };
+    }
+
+    function updateEvidenceUploadProgress(title, text) {
+      if (Swal.isVisible && Swal.isVisible()) {
+        Swal.update({ title: title || 'Đang tải file', text: text || '' });
+      }
+    }
+
+    function handleEvidenceFileSelected(input) {
+      const file = input.files && input.files[0];
+      const item = evidenceUploadTarget;
+      if (!file || !item) return;
+      if (file.size > 15 * 1024 * 1024) {
+        Swal.fire('Tệp quá lớn', 'Dung lượng tệp tối đa cho phép là 15MB.', 'warning');
+        input.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      const evidenceFileName = buildEvidenceUploadFileName(item, file);
+      Swal.fire({
+        title: 'Đang chuẩn bị tải file',
+        text: 'Đang đọc tệp từ thiết bị...',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => Swal.showLoading()
+      });
+      reader.onload = function(event) {
+        updateEvidenceUploadProgress('Đang tải file lên Drive', 'File đang được gửi lên kho minh chứng. Vui lòng không đóng màn hình.');
+        if (typeof google === 'undefined') {
+          input.value = '';
+          Swal.fire('Không thể tải file', 'Chưa kết nối được Google Apps Script.', 'error');
+          return;
+        }
+        google.script.run.withSuccessHandler(res => {
+          input.value = '';
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            Swal.fire('Lỗi tải file', res && res.message ? res.message : 'Vui lòng thử lại.', 'error');
+            return;
+          }
+          const uploadedName = res.fileName || evidenceFileName;
+          const nextEvidenceList = (Array.isArray(item.evidences_bv) ? item.evidences_bv.slice() : []);
+          nextEvidenceList.push(createEvidenceFileRecord({
+            title: uploadedName,
+            url: res.url || '',
+            type: 'file',
+            note: ''
+          }));
+          updateEvidenceUploadProgress('Đang lưu minh chứng', 'File đã lên Drive, hệ thống đang gắn file vào tiểu mục.');
+          saveEvidenceItem(item, {
+            evidences_bv: nextEvidenceList,
+            evidence_status: item.evidence_status === 'reviewed' ? 'draft' : (item.evidence_status || 'draft'),
+            evidence_review_note: item.evidence_review_note || ''
+          }, () => {});
+        }).withFailureHandler(err => {
+          input.value = '';
+          Swal.fire('Lỗi tải file', err && err.message ? err.message : 'Không thể tải file lên Drive. Vui lòng thử lại.', 'error');
+        }).uploadFileToDrive(event.target.result, evidenceFileName, file.type, item.khoa, item.maTC || item.magop || 'Chung', getSessionToken());
+      };
+      reader.onerror = function() {
+        input.value = '';
+        Swal.fire('Không đọc được file', 'Vui lòng chọn lại tệp hoặc thử với tệp khác.', 'error');
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>

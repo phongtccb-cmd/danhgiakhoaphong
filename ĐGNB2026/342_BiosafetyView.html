@@ -1,0 +1,137 @@
+<div id="view-biosafety" class="view-section">
+  <header class="bio-header">
+    <span class="material-symbols-outlined bio-header-mark">health_and_safety</span>
+    <div class="bio-header-inner">
+      <div>
+        <h1 class="bio-header-title">An to&#224;n sinh h&#7885;c</h1>
+        <p class="bio-header-subtitle">B&#7843;ng ki&#7875;m ATSH cho c&#225;c khoa x&#233;t nghi&#7879;m</p>
+      </div>
+      <div class="bio-header-actions">
+        <button type="button" onclick="loadBiosafetyChecklist(true)" class="bio-header-btn">
+          <span class="material-symbols-outlined text-[18px]">refresh</span> T&#7843;i l&#7841;i
+        </button>
+        <button type="button" onclick="saveBiosafety()" id="btn-bio-save" class="bio-header-btn bio-save-btn hidden">
+          <span class="material-symbols-outlined text-[18px]">cloud_done</span> <span id="bio-save-label">&#272;&#227; &#273;&#7891;ng b&#7897;</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="px-4 md:px-8 py-6 w-full max-w-none mx-auto pb-24">
+    <section class="bio-toolbar">
+      <div>
+        <label class="bio-label">Khoa x&#233;t nghi&#7879;m</label>
+        <select id="bio-dept" class="bio-control" onchange="loadBiosafetyChecklist(true)"></select>
+      </div>
+      <div>
+        <label class="bio-label">K&#7923; &#273;&#225;nh gi&#225;</label>
+        <input id="bio-period" class="bio-control" onchange="loadBiosafetyChecklist(true)" />
+      </div>
+      <div>
+        <label class="bio-label">Ch&#432;&#417;ng</label>
+        <select id="bio-chapter" class="bio-control" onchange="setBiosafetyChapter(this.value)"></select>
+      </div>
+      <div>
+        <label class="bio-label">Vai tr&#242;</label>
+        <select id="bio-role" class="bio-control" onchange="setBiosafetyRoleView()">
+          <option value="khoa">Khoa t&#7921; &#273;&#225;nh gi&#225;</option>
+          <option value="doan_kiem_tra">&#272;o&#224;n ki&#7875;m tra</option>
+        </select>
+      </div>
+    </section>
+
+    <div id="bio-loading" class="hidden bio-state">
+      <span class="material-symbols-outlined animate-spin text-[42px] text-emerald-700">sync</span>
+      <p>&#272;ang t&#7843;i b&#7843;ng ki&#7875;m ATSH...</p>
+    </div>
+
+    <div id="bio-empty" class="hidden bio-state">
+      <span class="material-symbols-outlined text-[42px] text-slate-400">science</span>
+      <p>Ch&#432;a c&#243; d&#7919; li&#7879;u ATSH.</p>
+      <small>T&#7841;o sheet ATSH_Master ho&#7863;c nh&#7853;p sheet BK ATSH - Sheet1 v&#224;o spreadsheet.</small>
+    </div>
+
+    <section id="bio-panel" class="hidden">
+      <div class="bio-summary">
+        <div class="bio-stat"><span>T&#7893;ng ti&#234;u m&#7909;c</span><strong id="bio-total">0</strong></div>
+        <div class="bio-stat"><span>Khoa &#273;&#227; ch&#7845;m</span><strong id="bio-khoa-done">0%</strong></div>
+        <div class="bio-stat"><span>&#272;o&#224;n &#273;&#227; ch&#7845;m</span><strong id="bio-doan-done">0%</strong></div>
+        <div class="bio-stat"><span>Kh&#244;ng &#273;&#7841;t</span><strong id="bio-fail">0</strong></div>
+      </div>
+
+      <div class="bio-action-bar">
+        <div>
+          <span id="bio-active-chapter">B&#7843;ng ki&#7875;m</span>
+          <strong id="bio-active-progress">0/0</strong>
+        </div>
+        <div class="bio-action-hub">
+          <button type="button" onclick="bulkBiosafetyMark('Đạt')" class="bio-action-btn is-pass">
+            <span class="material-symbols-outlined">done_all</span> &#272;&#7841;t h&#7871;t
+          </button>
+          <button type="button" onclick="bulkBiosafetyMark('Không đạt')" class="bio-action-btn is-fail">
+            <span class="material-symbols-outlined">close</span> Kh&#244;ng &#273;&#7841;t
+          </button>
+          <button type="button" onclick="bulkBiosafetyMark('Không áp dụng')" class="bio-action-btn">
+            <span class="material-symbols-outlined">block</span> KAD
+          </button>
+          <button type="button" onclick="syncBiosafetyFromKhoa()" id="bio-btn-sync-role" class="bio-action-btn is-sync">
+            <span class="material-symbols-outlined">flash_on</span> &#272;&#7891;ng b&#7897;
+          </button>
+        </div>
+      </div>
+
+      <div id="bio-list" class="bio-list"></div>
+    </section>
+  </div>
+
+  <style>
+    .bio-header { position: relative; overflow: hidden; padding: 32px 24px 24px; background: #14532d; color: #fff; border-bottom: 1px solid rgba(20, 83, 45, 0.22); }
+    .bio-header-mark { position: absolute; right: -14px; top: -16px; color: rgba(255,255,255,0.07); font-size: 120px; transform: rotate(10deg); pointer-events: none; }
+    .bio-header-inner { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .bio-header-title { color: #fff; font-size: 20px; line-height: 1.25; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }
+    .bio-header-subtitle { margin-top: 4px; color: #dcfce7; font-size: 13px; line-height: 1.45; font-weight: 700; }
+    .bio-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .bio-header-btn { min-height: 42px; padding: 10px 16px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: #fff; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); font-size: 12px; font-weight: 900; cursor: pointer; }
+    .bio-header-btn.hidden { display: none !important; }
+    .bio-save-btn { background: #0f766e; border-color: #0f766e; }
+    .bio-save-btn.is-clean { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.18); color: #dcfce7; }
+    .bio-toolbar { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; margin-bottom: 16px; display: grid; grid-template-columns: minmax(210px, 280px) minmax(120px, 160px) minmax(220px, 1fr) minmax(170px, 220px); gap: 12px; align-items: end; }
+    .bio-label { display: block; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase; margin: 0 0 6px 2px; }
+    .bio-control { width: 100%; min-height: 42px; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 10px; background: #fff; color: #111827; font-size: 13px; font-weight: 800; }
+    .bio-state { background: #fff; border: 1px dashed #d1d5db; border-radius: 14px; min-height: 280px; align-items: center; justify-content: center; flex-direction: column; color: #64748b; text-align: center; }
+    .bio-state p { margin-top: 8px; color: #334155; font-size: 14px; font-weight: 900; }
+    .bio-state small { margin-top: 4px; color: #94a3b8; font-size: 12px; font-weight: 700; }
+    .bio-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .bio-stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+    .bio-stat span { display: block; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .bio-stat strong { display: block; margin-top: 6px; color: #14532d; font-size: 24px; line-height: 1; font-weight: 900; }
+    .bio-action-bar { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .bio-action-bar span { color: #334155; font-size: 13px; font-weight: 900; }
+    .bio-action-bar strong { margin-left: 8px; color: #166534; font-size: 13px; font-weight: 900; }
+    .bio-action-hub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .bio-action-btn { min-height: 38px; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 11px; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #334155; font-size: 12px; font-weight: 900; cursor: pointer; }
+    .bio-action-btn .material-symbols-outlined { font-size: 18px; }
+    .bio-action-btn.is-pass { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+    .bio-action-btn.is-fail { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+    .bio-action-btn.is-sync { color: #0f766e; background: #f0fdfa; border-color: #99f6e4; }
+    .bio-list { display: grid; gap: 10px; }
+    .bio-item { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) minmax(220px, 320px); gap: 12px; align-items: start; }
+    .bio-item-meta { color: #166534; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .bio-item-title { margin-top: 5px; color: #111827; font-size: 13px; line-height: 1.55; font-weight: 850; }
+    .bio-item-guide { margin-top: 8px; color: #64748b; font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
+    .bio-note { width: 100%; min-height: 78px; border: 1px solid #d1d5db; border-radius: 10px; padding: 9px 10px; font-size: 12px; line-height: 1.45; resize: vertical; }
+    .bio-result { width: 100%; min-height: 40px; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 900; background: #fff; }
+    .bio-other { color: #64748b; font-size: 11px; line-height: 1.5; font-weight: 800; }
+    @media (max-width: 1024px) {
+      .bio-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .bio-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .bio-item { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .bio-header-inner, .bio-action-bar { align-items: stretch; flex-direction: column; }
+      .bio-header-actions, .bio-action-hub { justify-content: stretch; }
+      .bio-header-btn, .bio-action-btn { flex: 1; }
+      .bio-toolbar, .bio-summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</div>

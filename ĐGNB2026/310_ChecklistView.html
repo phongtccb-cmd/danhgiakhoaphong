@@ -1,0 +1,902 @@
+<!-- GIAO DIỆN CHẤM ĐIỂM TIÊU CHÍ (MASTER-DETAIL WORKFLOW - ULTRA-WIDE COMPACT GRID) -->
+<div id="view-checklist" class="view-section">
+  
+  <!-- Thẻ input chọn file ẩn phục vụ tính năng Add File trực tiếp -->
+  <input type="file" id="file-uploader-input" onchange="handleFileSelected(this)" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
+
+  <!-- COMPACT HEADER BREADCRUMB (Bỏ header khổng lồ, chỉ giữ Breadcrumb siêu gọn tối ưu diện tích dọc) -->
+  <div class="px-4 md:px-8 py-3 bg-white border-b border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-2">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-[#16a34a] text-[20px]">domain</span>
+      <span class="text-[14px] font-black text-gray-800 uppercase tracking-tight" id="crumb-khoa">--</span>
+      <span class="text-gray-300">|</span>
+      <span class="material-symbols-outlined text-blue-500 text-[18px]">assignment_ind</span>
+      <span class="text-[13px] font-bold text-gray-500" id="crumb-phong">--</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="px-2.5 py-1 rounded-lg bg-green-50 text-green-700 text-[11px] font-black border border-green-100 uppercase tracking-wide">
+        Quy tắc Thác Nước BYT
+      </span>
+    </div>
+  </div>
+
+  <!-- MÀN HÌNH CHÍNH: KHUNG ĐÁNH GIÁ (BOXED PANEL LAYOUT) -->
+  <div class="checklist-shell px-4 md:px-6 py-5 w-full mx-auto">
+    <div class="checklist-workspace">
+      <aside id="checklist-config-box" class="checklist-config-panel bg-white rounded-2xl border border-gray-200 shadow-sm p-5 h-full min-h-[320px] flex flex-col">
+        <div class="pb-4 mb-4 border-b border-gray-100 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-green-50 text-green-600 border border-green-100 flex items-center justify-center">
+            <span class="material-symbols-outlined text-[22px]">tune</span>
+          </div>
+          <div>
+            <p class="text-[12px] font-black text-slate-500 uppercase tracking-wider">Bối cảnh chấm điểm</p>
+            <p class="text-[13px] font-bold text-slate-800" id="checklist-config-summary">--</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div>
+            <label class="font-bold text-gray-700 text-[12px] mb-1.5 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[#16a34a] text-[18px]">domain</span> Khoa được đánh giá
+            </label>
+            <select id="checklist-khoa" class="w-full bg-gray-50 border border-gray-200 hover:border-gray-300 focus:bg-white focus:border-green-500 rounded-xl px-3 py-3 outline-none text-gray-800 font-bold text-[13px] transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed">
+              <option value="">-- Đang tải danh sách Khoa... --</option>
+            </select>
+          </div>
+          <div>
+            <label class="font-bold text-gray-700 text-[12px] mb-1.5 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-blue-500 text-[18px]">assignment_ind</span> Phòng phụ trách
+            </label>
+            <select id="checklist-phong" class="w-full bg-blue-50/50 border border-blue-100 hover:border-blue-200 focus:bg-white focus:border-blue-500 rounded-xl px-3 py-3 outline-none text-blue-950 font-bold text-[13px] transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed">
+              <option value="">-- Đang tải danh sách Phòng... --</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="checklist-config-insight">
+          <div class="checklist-insight-row">
+            <span>Ti&ecirc;u ch&iacute; hiển thị</span>
+            <strong id="config-total-criteria">--</strong>
+          </div>
+          <div class="checklist-insight-row">
+            <span>Ph&ograve;ng được giao</span>
+            <strong id="config-assigned-count">--</strong>
+          </div>
+          <div class="checklist-assigned-box">
+            <span class="checklist-assigned-label">Ph&acirc;n c&ocirc;ng khả dụng</span>
+            <div id="config-assigned-phongs" class="checklist-assigned-list">--</div>
+          </div>
+        </div>
+
+        <button onclick="applyChecklistConfig()" id="btn-apply-checklist-config" class="mt-auto h-12 px-5 bg-slate-900 hover:bg-green-700 text-white rounded-xl font-black text-[12px] shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+          <span class="material-symbols-outlined text-[18px]">filter_alt</span> Tải tiêu chí
+        </button>
+      </aside>
+
+      <section class="min-w-0 flex flex-col h-full">
+        <!-- CHIẾC KHUNG GIAO DIỆN CAO CẤP (BOXED CONTAINER) -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-[0_8px_30px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col h-full" id="checklist-master-box" style="display: none;">
+          
+          <!-- Tiêu đề nhỏ bên trong khung -->
+          <div class="px-5 py-3.5 border-b border-gray-100 bg-slate-50/60 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div class="min-w-0">
+              <span class="text-[12px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <span class="material-symbols-outlined text-[16px] text-green-600">list_alt</span>
+                Tiến độ phân công tiêu chí
+              </span>
+              <div id="master-counter-badge" class="text-[11px] font-bold text-gray-400 mt-1">---</div>
+            </div>
+            <div class="checklist-master-filters">
+              <div class="relative min-w-0 flex-1">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                <input id="checklist-master-search" oninput="handleChecklistMasterFilterChange()" class="checklist-master-filter-control pl-9" placeholder="Tìm mã hoặc nội dung tiêu chí...">
+              </div>
+              <select id="checklist-master-status" onchange="handleChecklistMasterFilterChange()" class="checklist-master-filter-control checklist-master-status">
+                <option value="all">Tất cả trạng thái</option>
+                <option value="bv-empty">Chưa tự chấm</option>
+                <option value="bv-progress">Đang tự chấm</option>
+                <option value="bv-done">Đã tự chấm</option>
+                <option value="doan-progress">Đoàn đang chấm</option>
+                <option value="doan-done">Đoàn chấm xong</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Vùng chứa bảng giới hạn chiều cao + Cuộn nội bộ cố định Header -->
+          <div class="checklist-master-scroll custom-scroll">
+            <table class="checklist-master-table w-full text-left border-collapse table-fixed">
+              <thead>
+                <!-- Sticky Header -->
+                <tr class="bg-slate-100/90 backdrop-blur border-b border-gray-200 text-[11px] uppercase text-gray-500 tracking-wider font-bold sticky top-0 z-10 shadow-sm">
+                  <th class="p-3.5 w-24 text-center border-r border-gray-200">Tiêu chí</th>
+                  <th class="p-3.5 border-r border-gray-200 w-[45%]">Nội Dung Tiêu chí</th>
+                  <th class="p-3.5 text-center w-28 border-r border-gray-200">Khoa chấm</th>
+                  <th class="p-3.5 text-center w-28 border-r border-gray-200">Đoàn KTBV</th>
+                  <th class="p-3.5 text-center w-48 border-r border-gray-200">Trạng thái</th>
+                  <th class="p-3.5 text-center w-28">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="master-checklist-table-body" class="text-[13px] font-medium text-gray-700 divide-y divide-gray-100">
+                <!-- Render danh sách tiêu chí từ database -->
+              </tbody>
+            </table>
+          </div>
+          <div class="checklist-table-footer">
+            <div id="checklist-page-summary">Hiển thị 0-0 trong tổng 0 tiêu chí</div>
+            <div class="checklist-pager">
+              <label>Số dòng/trang:</label>
+              <select id="checklist-page-size" onchange="changeChecklistPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+              <button type="button" id="checklist-prev-page" onclick="changeChecklistPage(-1)">
+                <span class="material-symbols-outlined">chevron_left</span> Trước
+              </button>
+              <span id="checklist-page-label">Trang 1 / 1</span>
+              <button type="button" id="checklist-next-page" onclick="changeChecklistPage(1)">
+                Sau <span class="material-symbols-outlined">chevron_right</span>
+              </button>
+            </div>
+          </div>
+            <div id="checklist-master-mobile-list" class="hidden p-3 space-y-3"></div>
+          
+        </div>
+
+        <div id="master-checklist-empty" class="text-center py-14 px-6 bg-white rounded-2xl border border-dashed border-gray-200 text-slate-500 min-h-[320px] h-full flex flex-col items-center justify-center">
+          <span class="material-symbols-outlined text-[40px] text-green-600">tune</span>
+          <p class="font-black mt-2 text-[14px] text-slate-700">Chọn khoa và phòng phụ trách để bắt đầu chấm điểm.</p>
+          <p class="font-bold mt-1 text-[12px] text-slate-400">Danh sách tiêu chí sẽ tự lọc theo phân công trong Settings.</p>
+        </div>
+
+        <!-- Trạng thái Loading Master -->
+        <div id="master-checklist-loading" class="text-center py-20 text-slate-500 animate-pulse bg-white rounded-2xl border border-gray-200 min-h-[320px] h-full flex-col items-center justify-center" style="display: none;">
+          <span class="material-symbols-outlined animate-spin text-[40px] text-green-600">sync</span>
+          <p class="font-bold mt-2 text-[13px]">Đang tải dữ liệu và phân tích khung bối cảnh...</p>
+        </div>
+      </section>
+    </div>
+
+  </div>
+
+  <!-- POPUP CHI TIẾT CHẤM ĐIỂM (TỐI ƯU CẬNH ĐÁY VỚI BOTTOM MENU & LOẠI BỎ NÚT "X") -->
+  <div id="marking-modal" class="fixed inset-0 z-[100] flex items-start md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm hidden animate-[fadeIn_0.2s_ease-out]">
+    
+    <!-- Tự động trừ đi chiều cao của thanh menu bottom (64px) và vùng đệm tai thỏ/safe-area trên điện thoại di động -->
+    <div id="marking-modal-panel" class="bg-white rounded-none md:rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-100 w-full md:max-w-[96vw] lg:max-w-7xl flex flex-col overflow-hidden animate-[slideUp_0.24s_cubic-bezier(0.16,1,0.3,1)]">
+      
+      <!-- Modal Header (Bỏ nút X, mở rộng tối đa khoảng ngang cho tiêu đề & điểm dự kiến) -->
+      <div class="bg-slate-900 text-white px-5 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
+        <div class="flex flex-col gap-1 pr-4">
+          <span id="modal-tieu-chi-ma" class="text-green-400 font-black text-[12px] uppercase tracking-wider">TIÊU CHÍ A1.1</span>
+          <h2 id="modal-tieu-chi-ten" class="font-black text-[14px] sm:text-[15px] leading-snug text-slate-100 line-clamp-1">Người bệnh được chỉ dẫn rõ ràng, đón tiếp cụ thể</h2>
+        </div>
+        
+        <!-- Điểm Live Score & Nút Hành Động Hub -->
+        <div class="modal-action-hub flex items-center flex-wrap gap-2.5 flex-shrink-0">
+          
+          <!-- Hộp Tích Nhanh Hàng Loạt -->
+          <div class="modal-bulk-actions flex items-center bg-white/5 border border-white/10 p-1 rounded-xl gap-1">
+            <button onclick="bulkMarkAllRows('1')" class="modal-action-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-black text-[11px] transition-all flex items-center gap-1 cursor-pointer shadow-sm">
+              <span class="material-symbols-outlined text-[15px] font-black">done_all</span><span class="modal-action-label"> Đạt hết</span>
+            </button>
+            <button onclick="bulkMarkAllRows('0')" class="modal-action-btn bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-black text-[11px] transition-all flex items-center gap-1 cursor-pointer shadow-sm">
+              <span class="material-symbols-outlined text-[15px] font-black">close</span><span class="modal-action-label"> Không hết</span>
+            </button>
+          </div>
+
+          <!-- Nút Copy cho Đoàn KT -->
+                    <button id="modal-btn-sync" onclick="copyScoresInModal()" class="modal-action-btn hidden bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl font-black text-[11px] transition-all flex items-center gap-1 cursor-pointer shadow-sm">
+            <span class="material-symbols-outlined text-[16px]">flash_on</span><span class="modal-action-label"> Đồng bộ</span>
+          </button>
+
+          <!-- Điểm Real-time Thác nước -->
+          <div class="modal-score-chip bg-white/10 px-3.5 py-2 rounded-xl border border-white/10 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-amber-400 text-[18px]">military_tech</span>
+            <span class="modal-score-label text-[11px] font-black text-slate-300">Dự kiến:</span>
+            <span id="live-score-badge" class="text-[15px] font-black text-white">0/5</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Body (Bảng lưới chi tiết phẳng 100% - ĐÃ BỎ CỘT MỨC DƯ THỪA) -->
+      <div id="marking-modal-body" class="flex-1 overflow-y-auto custom-scroll p-4 sm:p-6 bg-slate-50/50">
+        <div id="marking-modal-table-wrap" class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <table id="marking-modal-table" class="w-full text-left border-collapse min-w-[1000px] table-fixed">
+            <thead>
+              <tr class="bg-slate-100 border-b border-gray-200 text-[11px] uppercase text-gray-500 tracking-wider font-bold">
+                <th class="p-3 border-r border-gray-200 w-[38%]">Nội Dung Khảo Sát / Kiểm Tra</th>
+                <th class="p-3 border-r border-gray-200 w-[140px] text-center">Hướng Dẫn Chuẩn</th>
+                <!-- Cột Tự chấm (Chỉ hiện cho Đoàn KT) -->
+                <th id="th-bv-score" class="p-3 text-center w-28 bg-green-50/50 border-r border-gray-200 hidden">Tự Chấm</th>
+                <th class="p-3 text-center w-32 border-r border-gray-200">Chấm Điểm</th>
+                <th class="p-3 border-r border-gray-200 w-[27%]">Ghi Chú Thực Tế</th>
+                <th class="p-3 text-center w-16">Minh Chứng</th>
+              </tr>
+            </thead>
+            <tbody id="modal-criteria-table-body" class="text-[13px] font-medium text-gray-700">
+              <!-- Sub-criteria items render ở đây -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div id="marking-modal-footer" class="px-5 py-4 border-t border-gray-100 bg-white flex items-center justify-between flex-shrink-0">
+        <div class="text-[11px] font-bold text-gray-400 hidden sm:block">
+          *Lưu ý: Bạn phải đạt 100% các tiêu chí của mức trước mới được tính điểm mức sau.
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+          <button onclick="closeMarkingModal()" class="px-5 py-2.5 rounded-xl font-bold text-[13px] text-gray-500 hover:bg-slate-100 transition-all cursor-pointer">Hủy bỏ</button>
+          <button onclick="submitDanhGiaModal()" id="btn-save-modal" class="bg-[#16a34a] hover:bg-[#15803d] text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-xl font-black text-[13px] shadow-[0_4px_12px_rgba(22,163,74,0.25)] active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">save</span> Cập nhật & Lưu điểm
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <style>
+    .checklist-shell {
+      max-width: none;
+    }
+    .checklist-workspace {
+      display: grid;
+      grid-template-columns: minmax(280px, 28%) minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
+      width: 100%;
+    }
+    .checklist-workspace > aside,
+    .checklist-workspace > section {
+      min-width: 0;
+    }
+    .checklist-config-panel {
+      min-height: calc(100vh - 154px);
+    }
+    #checklist-master-box,
+    #master-checklist-empty,
+    #master-checklist-loading {
+      min-height: calc(100vh - 154px);
+    }
+    .checklist-config-insight {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .checklist-insight-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .checklist-insight-row strong {
+      color: #0f172a;
+      font-size: 18px;
+      font-weight: 900;
+    }
+    .checklist-assigned-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+    .checklist-assigned-label {
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .checklist-assigned-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 30px;
+      align-content: flex-start;
+    }
+    .checklist-assigned-chip {
+      max-width: 100%;
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #15803d;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .checklist-assigned-empty {
+      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+    .checklist-master-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      max-height: calc(100vh - 170px);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .checklist-master-table {
+      min-width: 900px;
+      table-layout: fixed;
+    }
+    .checklist-master-table th,
+    .checklist-master-table td {
+      height: 44px;
+      vertical-align: middle;
+    }
+    .checklist-master-table thead th {
+      padding: 8px 10px !important;
+      white-space: nowrap;
+    }
+    .checklist-master-table tbody td {
+      padding: 6px 10px !important;
+    }
+    .checklist-master-table tbody td:nth-child(2) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .checklist-master-table th:last-child,
+    .checklist-master-table td:last-child {
+      position: sticky;
+      right: 0;
+      z-index: 4;
+      background: #ffffff;
+      box-shadow: -1px 0 0 #e5e7eb;
+    }
+    .checklist-master-table thead th:last-child {
+      z-index: 12;
+      background: #f1f5f9;
+    }
+    .checklist-master-table tbody tr:hover td:last-child {
+      background: #f8fafc;
+    }
+    .checklist-table-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 800;
+      background: #ffffff;
+      border-top: 1px solid #f1f5f9;
+    }
+    .checklist-pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+    .checklist-pager label {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .checklist-pager select {
+      height: 32px;
+      min-width: 68px;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 0 8px;
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 800;
+      outline: none;
+    }
+    .checklist-pager button {
+      height: 28px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: #64748b;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+    .checklist-pager button:not(:disabled):active {
+      transform: scale(0.97);
+    }
+    .checklist-pager button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      background: #94a3b8;
+    }
+    .checklist-pager .material-symbols-outlined {
+      font-size: 16px;
+    }
+    .checklist-master-filters {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: min(620px, 100%);
+    }
+    .checklist-master-filter-control {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #ffffff;
+      padding: 9px 11px;
+      color: #1f2937;
+      font-size: 12px;
+      font-weight: 800;
+      outline: none;
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+    .checklist-master-filter-control:focus {
+      border-color: #16a34a;
+      box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.10);
+    }
+    .checklist-master-status {
+      flex: 0 0 190px;
+    }
+    .checklist-master-mobile-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: #ffffff;
+      padding: 13px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+    .checklist-master-mobile-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .checklist-master-mobile-meta div {
+      min-width: 0;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 9px;
+      text-align: center;
+    }
+    .checklist-master-mobile-meta span {
+      display: block;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .checklist-master-mobile-meta strong {
+      display: block;
+      margin-top: 4px;
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    #marking-modal-panel {
+      height: 92vh;
+      max-height: 92vh;
+    }
+    #marking-modal-body {
+      min-height: 0;
+    }
+    #marking-modal-table .modal-level-row td {
+      font-size: 0;
+    }
+    .modal-level-toggle {
+      width: 100%;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .modal-level-toggle strong {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: white;
+      color: #64748b;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .modal-level-chevron {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: white;
+      color: #16a34a;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    #marking-modal-table .modal-item-row.hidden {
+      display: none !important;
+    }
+    #marking-modal {
+      font-family: 'Comfortaa', sans-serif;
+      box-sizing: border-box;
+    }
+    #marking-modal *,
+    #marking-modal *::before,
+    #marking-modal *::after {
+      box-sizing: border-box;
+    }
+    @media (max-width: 1199px) {
+      .checklist-workspace {
+        grid-template-columns: 1fr;
+      }
+      .checklist-config-panel {
+        min-height: auto;
+      }
+      #checklist-master-box,
+      #master-checklist-empty,
+      #master-checklist-loading {
+        min-height: 320px;
+      }
+      .checklist-master-scroll {
+        max-height: calc(100vh - 230px);
+      }
+    }
+    @media (max-width: 767px) {
+      #view-checklist header h1 {
+        font-size: 18px;
+        line-height: 1.25;
+      }
+      #view-checklist header p {
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .checklist-shell {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        padding-top: 14px !important;
+      }
+      .checklist-workspace {
+        gap: 12px;
+      }
+      .checklist-config-panel {
+        padding: 14px !important;
+        border-radius: 14px !important;
+      }
+      #checklist-master-box,
+      #master-checklist-empty,
+      #master-checklist-loading {
+        min-height: 300px;
+        border-radius: 14px !important;
+      }
+      .checklist-master-scroll {
+        max-height: 58vh;
+        display: block;
+      }
+      .checklist-master-table {
+        min-width: 820px;
+      }
+      .checklist-master-filters {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .checklist-master-status {
+        flex: 0 0 auto;
+      }
+      #checklist-master-mobile-list {
+        display: none !important;
+      }
+      .checklist-table-footer {
+        align-items: stretch;
+        flex-direction: column;
+        text-align: center;
+        padding: 12px;
+      }
+      .checklist-pager {
+        justify-content: center;
+      }
+      .checklist-master-mobile-meta {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .checklist-assigned-chip {
+        white-space: normal;
+      }
+      #marking-modal {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        padding: 0 !important;
+        align-items: stretch !important;
+        justify-content: stretch !important;
+        overflow: hidden !important;
+      }
+      #marking-modal-panel {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: white;
+        border-radius: 0 !important;
+        border-left: 0;
+        border-right: 0;
+        transform: none !important;
+      }
+      #marking-modal-panel > .bg-slate-900 {
+        padding: calc(12px + env(safe-area-inset-top)) 12px 12px !important;
+        gap: 10px;
+      }
+      #modal-tieu-chi-ten {
+        display: block;
+        -webkit-line-clamp: initial;
+        overflow: visible;
+        font-size: 13px;
+      }
+      #marking-modal-panel > .bg-slate-900 > div:first-child {
+        padding-right: 0 !important;
+      }
+      #marking-modal-panel > .bg-slate-900 .flex.items-center.flex-wrap {
+        width: 100%;
+        gap: 8px;
+      }
+      #marking-modal-panel > .bg-slate-900 .flex.items-center.bg-white\/5 {
+        flex: 1 1 100%;
+        justify-content: space-between;
+      }
+      #marking-modal-panel > .bg-slate-900 button {
+        flex: 1 1 0;
+        justify-content: center;
+        min-height: 34px;
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+      #modal-btn-sync,
+      #marking-modal-panel > .bg-slate-900 .bg-white\/10 {
+        flex: 1 1 140px;
+        justify-content: center;
+      }
+      #marking-modal-panel > .bg-slate-900 .modal-action-hub {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        width: 100%;
+        gap: 6px;
+      }
+      #marking-modal-panel > .bg-slate-900 .modal-bulk-actions {
+        display: contents !important;
+      }
+      #marking-modal-panel > .bg-slate-900 .modal-action-btn,
+      #marking-modal-panel > .bg-slate-900 .modal-score-chip {
+        min-width: 0;
+        width: 100%;
+        min-height: 36px;
+        height: 36px;
+        padding: 0 6px !important;
+        border-radius: 10px;
+        justify-content: center;
+        gap: 3px;
+      }
+      #marking-modal-panel > .bg-slate-900 .modal-action-label,
+      #marking-modal-panel > .bg-slate-900 .modal-score-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #marking-modal-panel > .bg-slate-900 .modal-action-btn .material-symbols-outlined,
+      #marking-modal-panel > .bg-slate-900 .modal-score-chip .material-symbols-outlined {
+        flex: 0 0 auto;
+        font-size: 15px !important;
+      }
+      #live-score-badge {
+        font-size: 13px !important;
+        white-space: nowrap;
+      }
+      #marking-modal-body {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        padding: 10px !important;
+        overflow-x: hidden;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+      #marking-modal-table-wrap {
+        overflow: visible !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      #marking-modal-table {
+        display: block;
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto !important;
+        border-collapse: separate;
+      }
+      #marking-modal-table thead {
+        display: none;
+      }
+      #marking-modal-table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+      }
+      #marking-modal-table tr {
+        display: block;
+        width: 100%;
+      }
+      #marking-modal-table tr:not(.modal-level-row) {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        overflow: hidden;
+      }
+      #marking-modal-table .modal-item-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+      #marking-modal-table .modal-item-row.hidden {
+        display: none !important;
+      }
+      #marking-modal-table .modal-level-row {
+        margin-top: 4px;
+      }
+      #marking-modal-table .modal-level-row td {
+        font-size: 0;
+        display: block;
+        width: 100%;
+        border: 0 !important;
+        border-radius: 12px;
+        padding: 9px 12px !important;
+        background: #f1f5f9;
+      }
+      .modal-level-toggle {
+        width: 100%;
+        min-height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      .modal-level-toggle strong {
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: white;
+        color: #64748b;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .modal-level-chevron {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        background: white;
+        color: #16a34a;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      #marking-modal-table tr:not(.modal-level-row) td {
+        display: block;
+        width: 100%;
+        border-right: 0 !important;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 9px 12px !important;
+        text-align: left !important;
+      }
+      #marking-modal-table .modal-item-row td:nth-child(1),
+      #marking-modal-table .modal-item-row td:nth-last-child(2) {
+        grid-column: 1 / -1;
+      }
+      #marking-modal-table .modal-item-row td:nth-child(2)::before,
+      #marking-modal-table .modal-item-row td:last-child::before {
+        display: none;
+      }
+      #marking-modal-table .modal-item-row td:nth-child(2),
+      #marking-modal-table .modal-item-row td:last-child {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+      }
+      #marking-modal-table .modal-item-row td:nth-last-child(3) {
+        min-width: 96px;
+      }
+      #marking-modal-table tr:not(.modal-level-row) td:last-child {
+        border-bottom: 0;
+      }
+      #marking-modal-table tr:not(.modal-level-row) td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 7px;
+        color: #94a3b8;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.2;
+        text-transform: uppercase;
+      }
+      #marking-modal-table .guideline-wrapper {
+        text-align: left !important;
+      }
+      #marking-modal-table .guideline-wrapper button {
+        min-height: 28px;
+        padding: 5px 9px;
+        border-radius: 10px;
+      }
+      #marking-modal-table .modal-item-row td:nth-last-child(3) > div {
+        justify-content: flex-start !important;
+      }
+      #marking-modal-table .modal-item-row td:nth-last-child(3) button {
+        width: 36px;
+        height: 36px;
+      }
+      #marking-modal-table .guideline-wrapper,
+      #marking-modal-table td[data-label="Chấm điểm"] > div,
+      #marking-modal-table td[data-label="Minh chứng"] {
+        text-align: left !important;
+      }
+      #marking-modal-table td[data-label="Chấm điểm"] > div {
+        justify-content: flex-start !important;
+      }
+      #marking-modal-table td[data-label="Tự chấm"] > div {
+        align-items: flex-start !important;
+      }
+      #marking-modal-table td[data-label="Minh chứng"] button {
+        margin-left: 0 !important;
+      }
+      #marking-modal-table textarea {
+        min-height: 58px !important;
+        max-height: 160px;
+      }
+      #marking-modal-footer {
+        flex: 0 0 auto !important;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+        box-shadow: 0 -8px 18px rgba(15, 23, 42, 0.08);
+        z-index: 2;
+      }
+      #marking-modal-footer > div:last-child {
+        gap: 8px;
+      }
+      #marking-modal-footer button {
+        min-height: 42px;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+      }
+      #btn-save-modal {
+        flex: 1 1 auto;
+        justify-content: center;
+        min-width: 0;
+        white-space: normal;
+        line-height: 1.2;
+      }
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+
+  
+</div>

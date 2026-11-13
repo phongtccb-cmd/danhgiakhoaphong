@@ -1,0 +1,154 @@
+<style>
+  .swal-lite-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(15, 23, 42, 0.46);
+  }
+  .swal-lite-popup {
+    width: min(440px, 100%);
+    max-height: min(86vh, 720px);
+    overflow: auto;
+    border-radius: 24px;
+    background: #fff;
+    color: #17231d;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24);
+    padding: 26px;
+    text-align: center;
+    font-family: inherit;
+  }
+  .swal-lite-title {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.22;
+    font-weight: 900;
+  }
+  .swal-lite-text {
+    margin: 12px 0 0;
+    color: #65756b;
+    font-size: 14px;
+    line-height: 1.65;
+    font-weight: 650;
+  }
+  .swal-lite-html {
+    margin-top: 14px;
+  }
+  .swal-lite-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 22px;
+  }
+  .swal-lite-button {
+    min-height: 42px;
+    border: 0;
+    border-radius: 12px;
+    padding: 0 18px;
+    color: #fff;
+    background: #2f7d57;
+    font-weight: 850;
+    cursor: pointer;
+  }
+  .swal-lite-cancel {
+    background: #94a3b8;
+  }
+  .swal-lite-loading .swal-lite-popup::after {
+    content: "Dang xu ly...";
+    display: block;
+    margin-top: 14px;
+    color: #65756b;
+    font-size: 13px;
+    font-weight: 800;
+  }
+</style>
+<script>
+  (() => {
+    let active = null;
+
+    function closeActive(result) {
+      if (!active) return;
+      const current = active;
+      active = null;
+      current.backdrop.remove();
+      current.resolve(result || {});
+    }
+
+    function button(label, color, className) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'swal-lite-button' + (className ? ' ' + className : '');
+      el.textContent = label;
+      if (color) el.style.backgroundColor = color;
+      return el;
+    }
+
+    window.Swal = {
+      DismissReason: { cancel: 'cancel', backdrop: 'backdrop', close: 'close', esc: 'esc', timer: 'timer' },
+      fire(arg1, arg2, arg3) {
+        const options = typeof arg1 === 'object'
+          ? Object.assign({}, arg1)
+          : { title: arg1 || '', text: arg2 || '', icon: arg3 || '' };
+
+        if (active) closeActive({ dismiss: 'close' });
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'swal-lite-backdrop';
+        const popup = document.createElement('div');
+        popup.className = 'swal-lite-popup';
+
+        const title = document.createElement('h2');
+        title.className = 'swal-lite-title';
+        title.textContent = options.title || '';
+        popup.appendChild(title);
+
+        if (options.text) {
+          const text = document.createElement('p');
+          text.className = 'swal-lite-text';
+          text.textContent = options.text;
+          popup.appendChild(text);
+        }
+
+        if (options.html) {
+          const html = document.createElement('div');
+          html.className = 'swal-lite-html';
+          html.innerHTML = options.html;
+          popup.appendChild(html);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'swal-lite-actions';
+        popup.appendChild(actions);
+        backdrop.appendChild(popup);
+        document.body.appendChild(backdrop);
+
+        return new Promise(resolve => {
+          active = { backdrop, popup, resolve };
+
+          if (options.showConfirmButton !== false) {
+            const ok = button(options.confirmButtonText || 'OK', options.confirmButtonColor || null);
+            ok.addEventListener('click', () => closeActive({ isConfirmed: true }));
+            actions.appendChild(ok);
+          }
+
+          if (options.showCancelButton) {
+            const cancel = button(options.cancelButtonText || 'Huy', options.cancelButtonColor || null, 'swal-lite-cancel');
+            cancel.addEventListener('click', () => closeActive({ dismiss: 'cancel' }));
+            actions.appendChild(cancel);
+          }
+
+          if (typeof options.didOpen === 'function') options.didOpen(popup);
+        });
+      },
+      close() {
+        closeActive({ dismiss: 'close' });
+      },
+      showLoading() {
+        if (active) active.backdrop.classList.add('swal-lite-loading');
+      }
+    };
+  })();
+</script>

@@ -1,0 +1,777 @@
+<div id="view-evidence" class="view-section">
+  <input type="file" id="evidence-file-input" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="handleEvidenceFileSelected(this)">
+
+  <header class="bg-[#0f172a] pt-8 px-6 pb-6 relative overflow-hidden md:rounded-t-2xl">
+    <span class="material-symbols-outlined absolute -right-4 -top-4 text-[118px] text-white/5 rotate-12 pointer-events-none">folder_managed</span>
+    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-[20px] font-black text-white uppercase">Qu&#7843;n l&#253; minh ch&#7913;ng</h1>
+        <p class="text-slate-300 text-[13px] mt-1 font-bold">R&#224; so&#225;t, l&#7885;c v&#224; c&#7853;p nh&#7853;t minh ch&#7913;ng &#273;&#227; t&#7843;i t&#7915; checklist</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="exportMissingEvidenceExcel()" id="btn-evidence-export-missing" class="bg-white/10 hover:bg-white/15 text-white px-4 py-2.5 rounded-xl font-black text-[12px] border border-white/10 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer">
+          <span class="material-symbols-outlined text-[18px]">download</span> Xu&#7845;t thi&#7871;u
+        </button>
+        <button type="button" onclick="loadEvidenceData(true)" id="btn-evidence-refresh" class="bg-white/10 hover:bg-white/15 text-white px-4 py-2.5 rounded-xl font-black text-[12px] border border-white/10 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer">
+          <span class="material-symbols-outlined text-[18px]">refresh</span> T&#7843;i l&#7841;i
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="evidence-page px-4 md:px-6 py-5 pb-24">
+    <section class="evidence-toolbar">
+      <div class="evidence-control">
+        <label>Khoa</label>
+        <select id="evidence-khoa" onchange="handleEvidenceKhoaChange()"></select>
+      </div>
+      <div class="evidence-control">
+        <label>Ph&#242;ng</label>
+        <select id="evidence-phong" onchange="loadEvidenceData(true)">
+          <option value="All">T&#7845;t c&#7843;</option>
+        </select>
+      </div>
+      <div class="evidence-control evidence-status-control">
+        <label>Tr&#7841;ng th&#225;i</label>
+        <select id="evidence-status" onchange="renderEvidenceList()">
+          <option value="all">T&#7845;t c&#7843;</option>
+          <option value="missing">Ch&#432;a c&#243;</option>
+          <option value="draft">Ch&#432;a r&#224; so&#225;t</option>
+          <option value="need_update">C&#7847;n b&#7893; sung</option>
+          <option value="reviewed">&#272;&#227; r&#224; so&#225;t</option>
+          <option value="unused">Kh&#244;ng s&#7917; d&#7909;ng</option>
+        </select>
+      </div>
+      <div class="evidence-control evidence-search">
+        <label>T&#236;m ki&#7871;m</label>
+        <div class="evidence-search-box">
+          <span class="material-symbols-outlined">search</span>
+          <input id="evidence-query" type="search" placeholder="Ti&#234;u ch&#237;, ph&#242;ng, n&#7897;i dung..." oninput="handleEvidenceSearchInput()">
+        </div>
+      </div>
+    </section>
+
+    <section class="evidence-status-tabs" id="evidence-status-tabs" aria-label="Lọc trạng thái minh chứng">
+      <button type="button" class="evidence-status-tab active" data-status="all" onclick="setEvidenceStatusFilter('all')">
+        <span class="material-symbols-outlined">list_alt</span>
+        Tất cả <strong id="evidence-tab-all">0</strong>
+      </button>
+      <button type="button" class="evidence-status-tab missing" data-status="missing" onclick="setEvidenceStatusFilter('missing')">
+        Chưa có <strong id="evidence-tab-missing">0</strong>
+      </button>
+      <button type="button" class="evidence-status-tab draft" data-status="draft" onclick="setEvidenceStatusFilter('draft')">
+        Chưa rà soát <strong id="evidence-tab-draft">0</strong>
+      </button>
+      <button type="button" class="evidence-status-tab need_update" data-status="need_update" onclick="setEvidenceStatusFilter('need_update')">
+        Cần bổ sung <strong id="evidence-tab-need-update">0</strong>
+      </button>
+      <button type="button" class="evidence-status-tab reviewed" data-status="reviewed" onclick="setEvidenceStatusFilter('reviewed')">
+        Đã rà soát <strong id="evidence-tab-reviewed">0</strong>
+      </button>
+      <button type="button" class="evidence-status-tab unused" data-status="unused" onclick="setEvidenceStatusFilter('unused')">
+        Không sử dụng <strong id="evidence-tab-unused">0</strong>
+      </button>
+    </section>
+
+    <section class="evidence-stats" aria-label="Thong ke minh chung">
+      <div class="evidence-stat">
+        <span class="material-symbols-outlined text-slate-600 bg-slate-100">format_list_bulleted</span>
+        <div><label>T&#7893;ng ti&#7875;u m&#7909;c</label><strong id="evidence-stat-total">0</strong></div>
+      </div>
+      <div class="evidence-stat">
+        <span class="material-symbols-outlined text-emerald-700 bg-emerald-50">task_alt</span>
+        <div><label>&#272;&#227; c&#243; minh ch&#7913;ng</label><strong id="evidence-stat-ready">0</strong></div>
+      </div>
+      <div class="evidence-stat">
+        <span class="material-symbols-outlined text-amber-700 bg-amber-50">playlist_add</span>
+        <div><label>C&#7847;n b&#7893; sung</label><strong id="evidence-stat-missing">0</strong></div>
+      </div>
+      <div class="evidence-stat">
+        <span class="material-symbols-outlined text-blue-700 bg-blue-50">link</span>
+        <div><label>C&#243; link Drive</label><strong id="evidence-stat-drive">0</strong></div>
+      </div>
+    </section>
+
+    <section class="evidence-insight" aria-label="Bang dieu phoi minh chung">
+      <div class="evidence-insight-main">
+        <div class="evidence-insight-head">
+          <div>
+            <strong>&#272;i&#7873;u ph&#7889;i minh ch&#7913;ng</strong>
+            <span id="evidence-insight-caption">Ch&#432;a c&#243; d&#7919; li&#7879;u</span>
+          </div>
+          <span class="material-symbols-outlined">monitoring</span>
+        </div>
+        <div class="evidence-progress-row">
+          <label>T&#7927; l&#7879; &#273;&#227; r&#224; so&#225;t</label>
+          <strong id="evidence-review-percent">0%</strong>
+        </div>
+        <div class="evidence-progress-track"><div id="evidence-review-bar" class="evidence-progress-fill"></div></div>
+      </div>
+      <div class="evidence-insight-side">
+        <div>
+          <label>C&#7847;n x&#7917; l&#253;</label>
+          <strong id="evidence-priority-count">0</strong>
+        </div>
+        <div>
+          <label>Ch&#432;a r&#224; so&#225;t</label>
+          <strong id="evidence-draft-count">0</strong>
+        </div>
+        <div>
+          <label>&#272;&#227; r&#224; so&#225;t</label>
+          <strong id="evidence-reviewed-count">0</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="evidence-loading" class="evidence-state hidden">
+      <span class="material-symbols-outlined animate-spin">sync</span>
+      <strong>&#272;ang t&#7843;i danh s&#225;ch minh ch&#7913;ng...</strong>
+    </section>
+
+    <section id="evidence-empty" class="evidence-state hidden">
+      <span class="material-symbols-outlined">inventory_2</span>
+      <strong>Ch&#432;a c&#243; minh ch&#7913;ng ph&#249; h&#7907;p.</strong>
+      <p>Thay &#273;&#7893;i b&#7897; l&#7885;c ho&#7863;c t&#7843;i minh ch&#7913;ng t&#7915; checklist.</p>
+    </section>
+
+    <section id="evidence-content" class="evidence-content hidden">
+      <div class="evidence-table-wrap custom-scroll">
+        <table class="evidence-table">
+          <thead>
+            <tr>
+              <th>Ti&#234;u ch&#237;</th>
+              <th>M&#7913;c</th>
+              <th>N&#7897;i dung ti&#7875;u m&#7909;c</th>
+              <th>C&#225;ch ch&#7845;m</th>
+              <th>Minh ch&#7913;ng</th>
+              <th>Tr&#7841;ng th&#225;i</th>
+              <th class="text-right">Thao t&#225;c</th>
+            </tr>
+          </thead>
+          <tbody id="evidence-table-body"></tbody>
+        </table>
+      </div>
+      <div class="evidence-table-footer">
+        <div id="evidence-page-summary">Hi&#7875;n th&#7883; 0-0 trong t&#7893;ng 0 ti&#7875;u m&#7909;c</div>
+        <div class="evidence-pager">
+          <label>S&#7889; d&#242;ng/trang:</label>
+          <select id="evidence-page-size" onchange="changeEvidencePageSize(this.value)">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+          <button type="button" id="evidence-prev-page" onclick="changeEvidencePage(-1)">
+            <span class="material-symbols-outlined">chevron_left</span> Tr&#432;&#7899;c
+          </button>
+          <span id="evidence-page-label">Trang 1 / 1</span>
+          <button type="button" id="evidence-next-page" onclick="changeEvidencePage(1)">
+            Sau <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+      </div>
+      <div id="evidence-mobile-list" class="evidence-mobile-list"></div>
+    </section>
+  </div>
+
+  <style>
+    .evidence-page { color: #18231d; }
+    .evidence-toolbar {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.8fr) minmax(260px, 2fr);
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #dfe7df;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+    .evidence-status-control { display: none; }
+    .evidence-control { min-width: 0; }
+    .evidence-control label {
+      display: block;
+      margin-bottom: 6px;
+      color: #66756b;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .evidence-control select,
+    .evidence-search-box {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #dfe7df;
+      border-radius: 12px;
+      background: #f8fafc;
+      color: #18231d;
+      font-size: 12px;
+      font-weight: 800;
+      outline: none;
+    }
+    .evidence-control select { padding: 0 12px; }
+    .evidence-control select:focus,
+    .evidence-search-box:focus-within {
+      border-color: #2f7d57;
+      box-shadow: 0 0 0 4px rgba(47, 125, 87, 0.12);
+      background: #fff;
+    }
+    .evidence-search-box { display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+    .evidence-search-box span { color: #64748b; font-size: 19px; }
+    .evidence-search-box input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #18231d;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .evidence-search-box input::placeholder { color: #66756b; opacity: 1; }
+    .evidence-status-tabs {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 12px;
+      padding: 12px;
+      background: #fff;
+      border: 1px solid #dfe7df;
+      border-radius: 16px;
+      overflow-x: auto;
+    }
+    .evidence-status-tab {
+      height: 36px;
+      min-width: 132px;
+      padding: 0 14px;
+      border: 1px solid #dfe7df;
+      border-left: 0;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 11.5px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      white-space: nowrap;
+      transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+    .evidence-status-tab:first-child {
+      border-left: 1px solid #dfe7df;
+      border-radius: 12px 0 0 12px;
+    }
+    .evidence-status-tab:last-child { border-radius: 0 12px 12px 0; }
+    .evidence-status-tab:hover { background: #fff; color: #2f7d57; }
+    .evidence-status-tab.active {
+      background: #2f7d57;
+      border-color: #2f7d57;
+      color: #fff;
+    }
+    .evidence-status-tab.missing:not(.active) { background: #fffbeb; color: #92400e; }
+    .evidence-status-tab.need_update:not(.active) { background: #fff7ed; color: #b45309; }
+    .evidence-status-tab.reviewed:not(.active) { background: #ecfdf5; color: #047857; }
+    .evidence-status-tab.unused:not(.active) { background: #fef2f2; color: #b91c1c; }
+    .evidence-status-tab strong {
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,.86);
+      color: #18231d;
+      font-size: 10.5px;
+      font-weight: 900;
+      box-shadow: 0 1px 2px rgba(15,23,42,.08);
+    }
+    .evidence-status-tab .material-symbols-outlined { font-size: 16px; }
+    .evidence-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .evidence-stat {
+      min-width: 0;
+      background: #fff;
+      border: 1px solid #dfe7df;
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .evidence-stat span {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .evidence-stat label {
+      display: block;
+      color: #66756b;
+      font-size: 10.5px;
+      font-weight: 900;
+    }
+    .evidence-stat strong {
+      display: block;
+      color: #18231d;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+    .evidence-insight {
+      display: none;
+      grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.9fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .evidence-insight-main,
+    .evidence-insight-side {
+      background: #fff;
+      border: 1px solid #dfe7df;
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .evidence-insight-head,
+    .evidence-progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .evidence-insight-head strong {
+      display: block;
+      color: #18231d;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .evidence-insight-head span:not(.material-symbols-outlined) {
+      display: block;
+      margin-top: 3px;
+      color: #66756b;
+      font-size: 11.5px;
+      font-weight: 800;
+    }
+    .evidence-insight-head .material-symbols-outlined {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #047857;
+      background: #ecfdf5;
+      flex-shrink: 0;
+    }
+    .evidence-progress-row { margin-top: 14px; }
+    .evidence-progress-row label {
+      color: #334155;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .evidence-progress-row strong {
+      color: #047857;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .evidence-progress-track {
+      height: 9px;
+      margin-top: 7px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #e7f3eb;
+    }
+    .evidence-progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: 999px;
+      background: #2f7d57;
+      transition: width .18s ease;
+    }
+    .evidence-insight-side {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .evidence-insight-side div {
+      min-width: 0;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 10px;
+    }
+    .evidence-insight-side label {
+      display: block;
+      color: #66756b;
+      font-size: 10.5px;
+      font-weight: 900;
+    }
+    .evidence-insight-side strong {
+      display: block;
+      margin-top: 3px;
+      color: #18231d;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+    .evidence-state {
+      min-height: 340px;
+      margin-top: 12px;
+      background: #fff;
+      border: 1px dashed #dfe7df;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #66756b;
+      gap: 8px;
+      padding: 24px;
+    }
+    .evidence-state.hidden,
+    .evidence-content.hidden {
+      display: none !important;
+    }
+    .evidence-state span { font-size: 40px; color: #2f7d57; }
+    .evidence-state strong { font-size: 14px; color: #334155; }
+    .evidence-state p { font-size: 12px; font-weight: 700; }
+    .evidence-content { margin-top: 12px; }
+    .evidence-table-wrap {
+      background: #fff;
+      border: 1px solid #dfe7df;
+      border-radius: 16px 16px 0 0;
+      overflow: auto;
+      max-height: calc(100vh - 390px);
+      min-height: 328px;
+    }
+    .evidence-table {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 1120px;
+      font-size: 12px;
+    }
+    .evidence-table th:nth-child(1), .evidence-table td:nth-child(1) { width: 86px; }
+    .evidence-table th:nth-child(2), .evidence-table td:nth-child(2) { width: 84px; }
+    .evidence-table th:nth-child(3), .evidence-table td:nth-child(3) { width: 35%; }
+    .evidence-table th:nth-child(4), .evidence-table td:nth-child(4) { width: 28%; }
+    .evidence-table th:nth-child(5), .evidence-table td:nth-child(5) { width: 142px; }
+    .evidence-table th:nth-child(6), .evidence-table td:nth-child(6) { width: 128px; }
+    .evidence-table th:nth-child(7), .evidence-table td:nth-child(7) { width: 124px; }
+    .evidence-table th:last-child,
+    .evidence-table td:last-child {
+      position: sticky;
+      right: 0;
+      z-index: 3;
+      background: #fff;
+      box-shadow: -1px 0 0 #dfe7df;
+    }
+    .evidence-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      background: #f8fafc;
+      color: #334155;
+      border-bottom: 1px solid #dfe7df;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 900;
+    }
+    .evidence-table thead th:last-child {
+      z-index: 6;
+      background: #f8fafc;
+    }
+    .evidence-table tbody td {
+      border-bottom: 1px solid #edf2ed;
+      height: 44px;
+      padding: 6px 10px;
+      vertical-align: middle;
+      color: #334155;
+      font-weight: 750;
+    }
+    .evidence-code { color: #047857; font-weight: 900; white-space: nowrap; }
+    .evidence-level {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 56px;
+      height: 26px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      border: 1px solid #dbe3ef;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .evidence-title {
+      color: #18231d;
+      font-weight: 900;
+      line-height: 1.35;
+    }
+    .evidence-hint {
+      color: #66756b;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .evidence-title,
+    .evidence-hint {
+      max-height: 32px;
+    }
+    .evidence-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .evidence-note {
+      max-width: 320px;
+      color: #334155;
+      font-size: 11.5px;
+      font-weight: 750;
+      line-height: 1.45;
+      white-space: pre-line;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .evidence-note-empty { color: #8b9a91; font-style: italic; }
+    .evidence-proof-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 28px;
+      max-width: 128px;
+      padding: 0 9px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 900;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .evidence-proof-badge .material-symbols-outlined { font-size: 15px; }
+    .evidence-proof-badge.missing { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+    .evidence-proof-badge.ready { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+    .evidence-proof-badge.note { color: #475569; background: #f8fafc; border-color: #e2e8f0; }
+    .evidence-reviewer {
+      color: #18231d;
+      font-size: 11.5px;
+      font-weight: 900;
+      line-height: 1.35;
+      max-width: 150px;
+    }
+    .evidence-review-date {
+      margin-top: 4px;
+      color: #66756b;
+      font-size: 10.5px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .evidence-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 26px;
+      padding: 0 9px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 900;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .evidence-badge.missing { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+    .evidence-badge.draft { color: #334155; background: #f1f5f9; border-color: #e2e8f0; }
+    .evidence-badge.need_update { color: #b45309; background: #fffbeb; border-color: #fcd34d; }
+    .evidence-badge.reviewed { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+    .evidence-badge.unused { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+    .evidence-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .evidence-icon-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #dfe7df;
+      border-radius: 10px;
+      background: #fff;
+      color: #334155;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s ease;
+    }
+    .evidence-icon-btn:hover { background: #f8fafc; color: #2f7d57; border-color: #b9d5c2; }
+    .evidence-icon-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .evidence-icon-btn span { font-size: 18px; }
+    .evidence-table-footer {
+      min-height: 58px;
+      padding: 12px 14px;
+      background: #fff;
+      border: 1px solid #dfe7df;
+      border-top: 0;
+      border-radius: 0 0 16px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #66756b;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .evidence-pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+    .evidence-pager label { color: #334155; font-weight: 800; }
+    .evidence-pager select {
+      height: 34px;
+      min-width: 74px;
+      border: 1px solid #dfe7df;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: #18231d;
+      font-size: 12px;
+      font-weight: 900;
+      padding: 0 8px;
+      outline: none;
+    }
+    .evidence-pager button {
+      height: 28px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 999px;
+      background: #64748b;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .evidence-pager button:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+    .evidence-pager button .material-symbols-outlined { font-size: 15px; }
+    #evidence-page-label {
+      color: #334155;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .evidence-mobile-list { display: none; }
+    .evidence-mobile-card {
+      background: #fff;
+      border: 1px solid #dfe7df;
+      border-radius: 14px;
+      padding: 13px;
+      margin-bottom: 10px;
+    }
+    .evidence-mobile-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .evidence-mobile-title {
+      color: #18231d;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1.4;
+      margin-top: 6px;
+    }
+    .evidence-mobile-meta {
+      margin-top: 8px;
+      color: #66756b;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .evidence-mobile-actions { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+    .evidence-detail-popup {
+      text-align: left;
+      color: #18231d;
+    }
+    .evidence-detail-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .evidence-detail-top > span:first-child {
+      color: #047857;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .evidence-detail-popup section {
+      border-top: 1px solid #e2e8f0;
+      padding: 10px 0;
+    }
+    .evidence-detail-popup label {
+      display: block;
+      color: #66756b;
+      font-size: 11px;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+    .evidence-detail-popup p {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.45;
+      white-space: pre-line;
+      margin: 0;
+    }
+    .evidence-detail-evidence {
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 10px;
+    }
+    .evidence-detail-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+    @media (max-width: 1024px) {
+      .evidence-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .evidence-search { grid-column: 1 / -1; }
+      .evidence-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .evidence-insight { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 767px) {
+      .evidence-toolbar { grid-template-columns: 1fr; }
+      .evidence-stats { grid-template-columns: 1fr 1fr; }
+      .evidence-insight-side { grid-template-columns: 1fr; }
+      .evidence-table-wrap {
+        display: block;
+        max-height: calc(100vh - 430px);
+        min-height: 310px;
+      }
+      .evidence-mobile-list { display: none; }
+      .evidence-table-footer {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .evidence-pager {
+        justify-content: center;
+      }
+    }
+  </style>
+
+  
+</div>

@@ -1,0 +1,750 @@
+<!-- 341_Controller_Lab2429.html: client-side behavior for 340_Lab2429View.html. -->
+<script>
+    let lab2429State = {
+      loaded: false,
+      loading: false,
+      activeTab: 'score',
+      activeChapter: '',
+      departments: [],
+      rows: [],
+      mode: 'readonly',
+      canWrite: false,
+      deptName: '',
+      dirty: false,
+      uploadTargetRowIndex: null
+    };
+
+    function initLab2429UI() {
+      if (!lab2429State.loaded && !lab2429State.loading) {
+        loadLab2429Departments();
+      } else {
+        renderLab2429();
+      }
+    }
+
+    function labEscape(value) {
+      return window.App.utils.escapeHtml(value || '');
+    }
+
+    function labNumber(value) {
+      const n = Number(value || 0);
+      return Number.isInteger(n) ? String(n) : n.toFixed(1);
+    }
+
+    function isLabMobileViewport() {
+      return window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+    }
+
+    function getLabRole() {
+      const roleSelect = document.getElementById('lab-role');
+      return roleSelect ? roleSelect.value : 'khoa';
+    }
+
+    function setLabLoading(isLoading) {
+      lab2429State.loading = isLoading;
+      document.getElementById('lab-loading').classList.toggle('hidden', !isLoading);
+      document.getElementById('lab-loading').classList.toggle('flex', isLoading);
+      document.getElementById('lab-score-panel').classList.toggle('hidden', isLoading || lab2429State.activeTab !== 'score');
+      document.getElementById('lab-report-panel').classList.toggle('hidden', isLoading || lab2429State.activeTab !== 'report');
+    }
+
+    function loadLab2429Departments() {
+      setLabLoading(true);
+      if (typeof google === 'undefined') return;
+      google.script.run
+        .withSuccessHandler(res => {
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            showLabError(res && res.message ? res.message : 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c b\u1ea3ng ki\u1ec3m x\u00e9t nghi\u1ec7m.');
+            return;
+          }
+          lab2429State.departments = res.data.departments || [];
+          lab2429State.mode = res.data.mode || 'readonly';
+          lab2429State.canWrite = !!res.data.canWrite;
+          const deptSelect = document.getElementById('lab-dept');
+          deptSelect.innerHTML = lab2429State.departments.map(dept => '<option value="' + labEscape(dept.name) + '">' + labEscape(dept.name) + '</option>').join('');
+          const roleSelect = document.getElementById('lab-role');
+          roleSelect.value = lab2429State.mode === 'doan_kiem_tra' ? 'doan_kiem_tra' : 'khoa';
+          roleSelect.disabled = lab2429State.mode !== 'admin';
+          document.getElementById('btn-lab-save').classList.toggle('hidden', !lab2429State.canWrite);
+          document.getElementById('btn-lab-save').classList.toggle('flex', lab2429State.canWrite);
+          updateLabSaveState();
+          if (!lab2429State.departments.length) {
+            setLabLoading(false);
+            document.getElementById('lab-empty').classList.remove('hidden');
+            document.getElementById('lab-empty').classList.add('flex');
+            return;
+          }
+          loadLab2429Checklist(true);
+        })
+        .withFailureHandler(err => showLabError(err && err.message ? err.message : String(err)))
+        .getLab2429Departments(getSessionToken());
+    }
+
+    function loadLab2429Checklist(force) {
+      const deptName = document.getElementById('lab-dept').value;
+      if (!deptName) return;
+      if (lab2429State.loaded && !force && lab2429State.deptName === deptName) {
+        renderLab2429();
+        return;
+      }
+      setLabLoading(true);
+      google.script.run
+        .withSuccessHandler(res => {
+          setLabLoading(false);
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            showLabError(res && res.message ? res.message : 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c b\u1ea3ng ki\u1ec3m x\u00e9t nghi\u1ec7m.');
+            return;
+          }
+          lab2429State.loaded = true;
+          lab2429State.rows = res.data.rows || [];
+          lab2429State.mode = res.data.mode || lab2429State.mode;
+          lab2429State.canWrite = !!res.data.canWrite;
+          lab2429State.deptName = res.data.deptName || deptName;
+          lab2429State.activeChapter = '';
+          lab2429State.dirty = false;
+          updateLabSaveState();
+          renderLab2429();
+        })
+        .withFailureHandler(err => showLabError(err && err.message ? err.message : String(err)))
+        .getLab2429Checklist(getSessionToken(), deptName);
+    }
+
+    function showLabError(message) {
+      setLabLoading(false);
+      document.getElementById('lab-empty').classList.remove('hidden');
+      document.getElementById('lab-empty').classList.add('flex');
+      if (typeof Swal !== 'undefined') Swal.fire('L\u1ed7i b\u1ea3ng ki\u1ec3m x\u00e9t nghi\u1ec7m', message, 'error');
+    }
+
+    function switchLab2429Tab(tab) {
+      if (lab2429State.activeTab === 'score') syncLabVisibleInputsToState();
+      lab2429State.activeTab = tab;
+      document.querySelectorAll('.lab-tab').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-lab-tab') === tab));
+      if (tab === 'report') loadLab2429Report();
+      else renderLab2429();
+    }
+
+    function groupLabRows() {
+      const chapters = [];
+      let currentChapter = null;
+      let currentParent = null;
+      lab2429State.rows.forEach(row => {
+        if (row.chapter && (!currentChapter || currentChapter.title !== row.chapter)) {
+          currentChapter = { title: row.chapter, items: [] };
+          chapters.push(currentChapter);
+          currentParent = null;
+        }
+        if (!currentChapter) {
+          currentChapter = { title: 'B\u1ea3ng ki\u1ec3m', items: [] };
+          chapters.push(currentChapter);
+        }
+        const isChild = /\.[a-zA-Z]$/.test(row.cleanCode || row.code || '');
+        if (isChild && currentParent) currentParent.children.push(row);
+        else {
+          row.children = [];
+          currentParent = row;
+          currentChapter.items.push(currentParent);
+        }
+      });
+      return chapters;
+    }
+
+    function renderLab2429() {
+      document.getElementById('lab-empty').classList.add('hidden');
+      document.getElementById('lab-empty').classList.remove('flex');
+      document.getElementById('lab-score-panel').classList.toggle('hidden', lab2429State.activeTab !== 'score');
+      document.getElementById('lab-report-panel').classList.toggle('hidden', lab2429State.activeTab !== 'report');
+      if (lab2429State.activeTab !== 'score') return;
+      const chapters = groupLabRows();
+      if (!chapters.length) {
+        document.getElementById('lab-empty').classList.remove('hidden');
+        document.getElementById('lab-empty').classList.add('flex');
+        return;
+      }
+      if (!lab2429State.activeChapter) lab2429State.activeChapter = chapters[0].title;
+      const chapterSelect = document.getElementById('lab-chapter');
+      if (chapterSelect) {
+        chapterSelect.innerHTML = chapters.map(chap => (
+          '<option value="' + labEscape(chap.title) + '" ' + (chap.title === lab2429State.activeChapter ? 'selected' : '') + '>' + labEscape(chap.title) + '</option>'
+        )).join('');
+      }
+      const active = chapters.find(chap => chap.title === lab2429State.activeChapter) || chapters[0];
+      document.getElementById('lab-score-list').innerHTML = renderLabChapterItems(active.items || []);
+      updateLabActionBar();
+    }
+
+    function setLabChapter(title) {
+      syncLabVisibleInputsToState();
+      lab2429State.activeChapter = title;
+      renderLab2429();
+    }
+
+    function setLabRoleView() {
+      syncLabVisibleInputsToState();
+      renderLab2429();
+      updateLabSaveState();
+    }
+
+    function getRowResult(row) {
+      return getLabRole() === 'doan_kiem_tra' ? row.doanResult : row.khoaResult;
+    }
+
+    function getRowNote(row) {
+      return getLabRole() === 'doan_kiem_tra' ? row.doanNote : row.khoaNote;
+    }
+
+    function getOtherResult(row) {
+      return getLabRole() === 'doan_kiem_tra' ? row.khoaResult : row.doanResult;
+    }
+
+    function flattenLabItems(items) {
+      const flattened = [];
+      (items || []).forEach(item => {
+        flattened.push(item);
+        (item.children || []).forEach(child => flattened.push(child));
+      });
+      return flattened;
+    }
+
+    function getActiveLabChapter() {
+      const chapters = groupLabRows();
+      if (!chapters.length) return { title: '', items: [] };
+      return chapters.find(chap => chap.title === lab2429State.activeChapter) || chapters[0];
+    }
+
+    function getLabResultWeight(result) {
+      if (result === 'Đạt') return 1;
+      if (result === 'Đạt một phần') return 0.5;
+      if (result === 'Không đạt') return 0;
+      return null;
+    }
+
+    function getLabStandardScore(row) {
+      const value = parseFloat(String(row && row.standardScore || '').replace(',', '.'));
+      return isNaN(value) ? 0 : value;
+    }
+
+    function updateLabActionBar() {
+      const bar = document.getElementById('lab-action-bar');
+      if (!bar) return;
+      const active = getActiveLabChapter();
+      const resultRows = flattenLabItems(active.items).filter(row => row && (row.code || row.content));
+      const filled = resultRows.filter(row => String(getRowResult(row) || '').trim()).length;
+      let score = 0;
+      let max = 0;
+      resultRows.forEach(row => {
+        const standard = getLabStandardScore(row);
+        if (standard > 0) max += standard;
+        const weight = getLabResultWeight(getRowResult(row));
+        if (weight !== null && standard > 0) score += standard * weight;
+      });
+      document.getElementById('lab-action-chapter').innerText = active.title || 'Chương';
+      document.getElementById('lab-action-progress').innerText = filled + '/' + resultRows.length + ' tiêu chí đã chấm';
+      document.getElementById('lab-action-score').innerText = labNumber(score) + '/' + labNumber(max);
+      document.querySelectorAll('.lab-action-btn').forEach(btn => {
+        btn.disabled = !lab2429State.canWrite || resultRows.length === 0;
+      });
+      const syncBtn = document.getElementById('lab-btn-sync-role');
+      if (syncBtn) syncBtn.classList.toggle('hidden', getLabRole() !== 'doan_kiem_tra');
+    }
+
+    function syncLabVisibleInputsToState() {
+      const role = getLabRole();
+      document.querySelectorAll('.lab-result').forEach(select => {
+        const rowIndex = Number(select.getAttribute('data-row-index'));
+        const row = lab2429State.rows.find(item => Number(item.rowIndex) === rowIndex);
+        if (!row) return;
+        const note = document.querySelector('.lab-note[data-row-index="' + rowIndex + '"]');
+        if (role === 'doan_kiem_tra') {
+          row.doanResult = select.value;
+          row.doanNote = composeLabNoteEvidence(note ? note.value : '', parseLabNoteEvidence(row.doanNote).evidences);
+        } else {
+          row.khoaResult = select.value;
+          row.khoaNote = composeLabNoteEvidence(note ? note.value : '', parseLabNoteEvidence(row.khoaNote).evidences);
+        }
+      });
+    }
+
+    function getOtherResultLabel() {
+      return getLabRole() === 'doan_kiem_tra' ? 'Khoa t\u1ef1 \u0111\u00e1nh gi\u00e1' : '\u0110o\u00e0n ki\u1ec3m tra';
+    }
+
+    function extractLabEvidenceUrl(value) {
+      const text = String(value || '').trim();
+      const absolute = text.match(/https?:\/\/[^\s"'<>]+/i);
+      if (absolute) return absolute[0].replace(/[),.;]+$/g, '');
+      const drive = text.match(/(?:^|\s)(drive\.google\.com\/[^\s"'<>]+)/i);
+      return drive ? 'https://' + drive[1].replace(/[),.;]+$/g, '') : '';
+    }
+
+    function parseLabNoteEvidence(value) {
+      const noteLines = [];
+      const evidences = [];
+      String(value || '').split(/\r?\n/).forEach(line => {
+        const text = String(line || '').trim();
+        if (!text) return;
+        const url = extractLabEvidenceUrl(text);
+        if (/^MC\s*:/i.test(text) && url) {
+          const title = text
+            .replace(/^MC\s*:/i, '')
+            .replace(url, '')
+            .replace(/\s+-\s*$/g, '')
+            .trim();
+          evidences.push({ title: title || url, url: url });
+        } else {
+          noteLines.push(line);
+        }
+      });
+      return { note: noteLines.join('\n').trim(), evidences: evidences };
+    }
+
+    function composeLabNoteEvidence(note, evidences) {
+      const cleanNote = String(note || '').trim();
+      const evidenceLines = (Array.isArray(evidences) ? evidences : [])
+        .filter(item => item && item.url)
+        .map(item => 'MC: ' + String(item.title || item.url || 'Minh chứng').trim() + ' - ' + String(item.url || '').trim());
+      return [cleanNote].concat(evidenceLines).filter(Boolean).join('\n');
+    }
+
+    function getLabRowByIndex(rowIndex) {
+      return lab2429State.rows.find(item => Number(item.rowIndex) === Number(rowIndex));
+    }
+
+    function renderLabEvidenceField(row, note, disabled) {
+      const disabledAttr = disabled ? 'disabled' : '';
+      const parsed = parseLabNoteEvidence(note);
+      const hasNote = !!parsed.note.trim();
+      const evidenceCount = parsed.evidences.length;
+      const firstEvidence = parsed.evidences[0];
+      const summary = hasNote ? parsed.note.replace(/\s+/g, ' ').slice(0, 80) : 'Chưa có ghi chú';
+      return '<div class="lab-evidence-cell lab-proof-cell">' +
+        '<textarea class="lab-note lab-note-hidden" data-row-index="' + row.rowIndex + '" ' + disabledAttr + ' oninput="markLabDirty()">' + labEscape(parsed.note) + '</textarea>' +
+        '<button type="button" class="lab-proof-summary" onclick="openLabEvidenceDetail(' + row.rowIndex + ')" title="Xem ghi chú và minh chứng">' +
+          '<span class="material-symbols-outlined">sticky_note_2</span>' +
+          '<span class="lab-proof-copy">' +
+            '<strong>' + (hasNote ? 'Có ghi chú' : 'Chưa ghi chú') + '</strong>' +
+            '<small>' + labEscape(firstEvidence ? (firstEvidence.title || firstEvidence.url || 'Minh chứng') : summary) + '</small>' +
+          '</span>' +
+          '<span class="lab-proof-count">' + evidenceCount + ' MC</span>' +
+        '</button>' +
+        '<div class="lab-proof-actions">' +
+          '<button type="button" onclick="editLabNoteByRowIndex(' + row.rowIndex + ')" ' + disabledAttr + ' title="Sửa ghi chú"><span class="material-symbols-outlined">edit_note</span></button>' +
+          '<button type="button" onclick="triggerLabEvidenceUpload(' + row.rowIndex + ')" ' + disabledAttr + ' title="Tải minh chứng"><span class="material-symbols-outlined">attach_file</span></button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderLabEvidenceDetailHtml(rowIndex, parsed) {
+      const noteHtml = parsed.note
+        ? '<div class="lab-detail-note">' + labEscape(parsed.note).replace(/\n/g, '<br>') + '</div>'
+        : '<div class="lab-detail-empty">Chưa có ghi chú.</div>';
+      const evidenceHtml = parsed.evidences.length
+        ? parsed.evidences.map((item, index) =>
+            '<div class="lab-detail-evidence-item">' +
+              '<a href="' + labEscape(item.url) + '" target="_blank" rel="noopener">' +
+                '<span class="material-symbols-outlined">description</span>' +
+                '<span>' + labEscape(item.title || item.url || 'Minh chứng') + '</span>' +
+              '</a>' +
+              (lab2429State.canWrite
+                ? '<button type="button" onclick="removeLabEvidenceFromDetail(' + rowIndex + ',' + index + ')" title="Xóa minh chứng"><span class="material-symbols-outlined">close</span></button>'
+                : '') +
+            '</div>'
+          ).join('')
+        : '<div class="lab-detail-empty">Chưa có minh chứng.</div>';
+      return '<div class="lab-detail-box">' +
+        '<div class="lab-detail-label">Ghi chú</div>' + noteHtml +
+        '<div class="lab-detail-label">Minh chứng</div>' +
+        '<div class="lab-detail-evidence-list">' + evidenceHtml + '</div>' +
+      '</div>';
+    }
+
+    function openLabEvidenceDetail(rowIndex) {
+      syncLabVisibleInputsToState();
+      const row = getLabRowByIndex(rowIndex);
+      if (!row || typeof Swal === 'undefined') return;
+      const parsed = parseLabNoteEvidence(getRowNote(row));
+      Swal.fire({
+        title: 'Ghi chú / minh chứng',
+        html: renderLabEvidenceDetailHtml(Number(rowIndex), parsed),
+        showCancelButton: lab2429State.canWrite,
+        showConfirmButton: true,
+        confirmButtonText: 'Đóng',
+        cancelButtonText: 'Sửa ghi chú',
+        customClass: { popup: 'lab-detail-popup' }
+      }).then(result => {
+        if (result.dismiss === Swal.DismissReason.cancel) editLabNoteByRowIndex(rowIndex);
+      });
+    }
+
+    function editLabNoteByRowIndex(rowIndex) {
+      if (!lab2429State.canWrite || typeof Swal === 'undefined') return;
+      syncLabVisibleInputsToState();
+      const row = getLabRowByIndex(rowIndex);
+      if (!row) return;
+      const parsed = parseLabNoteEvidence(getRowNote(row));
+      Swal.fire({
+        title: 'Sửa ghi chú',
+        input: 'textarea',
+        inputValue: parsed.note,
+        inputPlaceholder: 'Nhập ghi chú riêng...',
+        inputAttributes: { 'aria-label': 'Ghi chú 2429' },
+        showCancelButton: true,
+        confirmButtonText: 'Cập nhật',
+        cancelButtonText: 'Hủy',
+        inputValidator: value => String(value || '').length > 2000 ? 'Ghi chú tối đa 2000 ký tự.' : undefined
+      }).then(result => {
+        if (!result.isConfirmed) return;
+        setLabRowNote(row, composeLabNoteEvidence(result.value || '', parsed.evidences));
+        lab2429State.dirty = true;
+        updateLabSaveState();
+        updateLabActionBar();
+        renderLab2429();
+      });
+    }
+
+    function removeLabEvidenceFromDetail(rowIndex, evidenceIndex) {
+      removeLabEvidence(rowIndex, evidenceIndex);
+      window.setTimeout(() => openLabEvidenceDetail(rowIndex), 0);
+    }
+
+    function updateLabSaveState() {
+      const btn = document.getElementById('btn-lab-save');
+      const label = document.getElementById('lab-save-label');
+      if (!btn || !label) return;
+      btn.disabled = !lab2429State.canWrite || !lab2429State.dirty;
+      btn.classList.toggle('is-clean', !lab2429State.dirty);
+      label.innerText = lab2429State.dirty ? 'L\u01b0u thay \u0111\u1ed5i' : '\u0110\u00e3 \u0111\u1ed3ng b\u1ed9';
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon) icon.innerText = lab2429State.dirty ? 'save' : 'cloud_done';
+    }
+
+    function renderLabChapterItems(items) {
+      if (!items || !items.length) {
+        return '<div class="text-center text-slate-400 font-bold py-8">Kh&#244;ng c&#243; ti&#234;u ch&#237; trong ch&#432;&#417;ng n&#224;y.</div>';
+      }
+      if (isLabMobileViewport()) return renderLabMobileItems(items);
+
+      let body = '';
+      let currentGroup = '';
+      items.forEach(item => {
+        if (item.group && item.group !== currentGroup) {
+          body += '<tr class="lab-group-row-table"><td colspan="5">' + labEscape(item.group) + '</td></tr>';
+          currentGroup = item.group;
+        }
+        body += renderLabTableRow(item, false);
+        (item.children || []).forEach(child => {
+          body += renderLabTableRow(child, true);
+        });
+      });
+      return '<table class="lab-table">' +
+        '<thead><tr>' +
+          '<th style="width:90px">M&#227;</th>' +
+          '<th>N&#7897;i dung ti&#234;u ch&#237;</th>' +
+          '<th style="width:190px">K&#7871;t qu&#7843;</th>' +
+          '<th style="width:260px">Ghi ch&#250; / minh ch&#7913;ng</th>' +
+          '<th style="width:150px">' + labEscape(getOtherResultLabel()) + '</th>' +
+        '</tr></thead>' +
+        '<tbody>' + body + '</tbody>' +
+      '</table>';
+    }
+
+    function renderLabTableRow(row, isChild) {
+      const result = getRowResult(row);
+      const note = getRowNote(row);
+      const other = getOtherResult(row);
+      const disabled = lab2429State.canWrite ? '' : 'disabled';
+      const options = ['', '\u0110\u1ea1t', '\u0110\u1ea1t m\u1ed9t ph\u1ea7n', 'Kh\u00f4ng \u0111\u1ea1t', 'Kh\u00f4ng \u00e1p d\u1ee5ng'].map(value => (
+        '<option value="' + labEscape(value) + '" ' + (value === result ? 'selected' : '') + '>' + (value || '-- Ch&#7885;n --') + '</option>'
+      )).join('');
+      return '<tr class="' + (isChild ? 'lab-child-row' : 'lab-parent-row') + '" data-row-index="' + row.rowIndex + '">' +
+        '<td><div class="lab-code">' + labEscape(row.code) + '</div></td>' +
+        '<td><div class="lab-content-text">' + (isChild ? '<span class="text-slate-400 font-black mr-1">&#8627;</span>' : '') + labEscape(row.content) + '</div></td>' +
+        '<td><select class="lab-result" data-row-index="' + row.rowIndex + '" ' + disabled + ' onchange="markLabDirty()">' + options + '</select></td>' +
+        '<td>' + renderLabEvidenceField(row, note, !lab2429State.canWrite) + '</td>' +
+        '<td>' + (other ? '<span class="lab-ref">' + labEscape(other) + '</span>' : '<span class="text-slate-300 font-bold">--</span>') + '</td>' +
+      '</tr>';
+    }
+
+    function renderLabMobileItems(items) {
+      let html = '<div class="lab-mobile-list">';
+      let currentGroup = '';
+      items.forEach(item => {
+        if (item.group && item.group !== currentGroup) {
+          html += '<div class="lab-mobile-group">' + labEscape(item.group) + '</div>';
+          currentGroup = item.group;
+        }
+        html += renderLabMobileCard(item, false);
+        (item.children || []).forEach(child => {
+          html += renderLabMobileCard(child, true);
+        });
+      });
+      return html + '</div>';
+    }
+
+    function renderLabMobileCard(row, isChild) {
+      const result = getRowResult(row);
+      const note = getRowNote(row);
+      const other = getOtherResult(row);
+      const disabled = lab2429State.canWrite ? '' : 'disabled';
+      const options = ['', '\u0110\u1ea1t', '\u0110\u1ea1t m\u1ed9t ph\u1ea7n', 'Kh\u00f4ng \u0111\u1ea1t', 'Kh\u00f4ng \u00e1p d\u1ee5ng'].map(value => (
+        '<option value="' + labEscape(value) + '" ' + (value === result ? 'selected' : '') + '>' + (value || '-- Ch\u1ecdn --') + '</option>'
+      )).join('');
+      return '<article class="lab-mobile-card ' + (isChild ? 'is-child' : '') + '" data-row-index="' + row.rowIndex + '">' +
+        '<div class="lab-mobile-main">' +
+          '<div class="lab-mobile-head">' +
+            '<div class="lab-mobile-code">' + (isChild ? '&#8627; ' : '') + labEscape(row.code) + '</div>' +
+            (row.standardScore ? '<span class="lab-mobile-standard">' + labEscape(row.standardScore) + ' &#273;i&#7875;m</span>' : '') +
+          '</div>' +
+          '<div class="lab-mobile-content">' + labEscape(row.content) + '</div>' +
+          '<div class="lab-mobile-fields">' +
+            '<div class="lab-mobile-field">' +
+              '<label>K&#7871;t qu&#7843;</label>' +
+              '<select class="lab-result" data-row-index="' + row.rowIndex + '" ' + disabled + ' onchange="markLabDirty()">' + options + '</select>' +
+            '</div>' +
+            '<div class="lab-mobile-field">' +
+              '<label>Ghi ch&#250; / minh ch&#7913;ng</label>' +
+              renderLabEvidenceField(row, note, !lab2429State.canWrite) +
+            '</div>' +
+          '</div>' +
+          '<div class="lab-mobile-ref-row">' +
+            '<span>' + labEscape(getOtherResultLabel()) + '</span>' +
+            (other ? '<span class="lab-ref">' + labEscape(other) + '</span>' : '<span class="text-slate-300 font-bold">--</span>') +
+          '</div>' +
+        '</div>' +
+      '</article>';
+    }
+    function markLabDirty() {
+      syncLabVisibleInputsToState();
+      lab2429State.dirty = true;
+      updateLabSaveState();
+      updateLabActionBar();
+    }
+
+    function bulkLab2429Mark(result) {
+      if (!lab2429State.canWrite) return;
+      syncLabVisibleInputsToState();
+      const rows = flattenLabItems(getActiveLabChapter().items);
+      const role = getLabRole();
+      rows.forEach(row => {
+        if (role === 'doan_kiem_tra') row.doanResult = result;
+        else row.khoaResult = result;
+      });
+      lab2429State.dirty = true;
+      updateLabSaveState();
+      renderLab2429();
+    }
+
+    function syncLab2429FromOtherRole() {
+      if (!lab2429State.canWrite || getLabRole() !== 'doan_kiem_tra') return;
+      syncLabVisibleInputsToState();
+      const rows = flattenLabItems(getActiveLabChapter().items);
+      rows.forEach(row => {
+        row.doanResult = row.khoaResult || row.doanResult || '';
+        row.doanNote = row.khoaNote || row.doanNote || '';
+      });
+      lab2429State.dirty = true;
+      updateLabSaveState();
+      renderLab2429();
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Đã đồng bộ chương hiện tại',
+        showConfirmButton: false,
+        timer: 1800
+      });
+    }
+
+    function sanitizeLabFileNamePart(value, fallback) {
+      const text = String(value || '').trim()
+        .replace(/[\\/:*?"<>|]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return (text || fallback || 'Minh_chung').slice(0, 80);
+    }
+
+    function buildLabEvidenceFileName(row, file) {
+      const originalName = String(file && file.name || 'file').trim();
+      const dotIndex = originalName.lastIndexOf('.');
+      const extension = dotIndex > 0 ? originalName.slice(dotIndex).replace(/[\\/:*?"<>|\s]+/g, '') : '';
+      const dept = sanitizeLabFileNamePart(lab2429State.deptName || document.getElementById('lab-dept')?.value, 'Khoa_XN');
+      const code = sanitizeLabFileNamePart(row && (row.cleanCode || row.code), '2429');
+      const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+      return [dept, code, stamp].filter(Boolean).join(' - ').slice(0, 160) + extension;
+    }
+
+    function triggerLabEvidenceUpload(rowIndex) {
+      if (!lab2429State.canWrite) return;
+      lab2429State.uploadTargetRowIndex = Number(rowIndex);
+      const input = document.getElementById('lab-evidence-file-input');
+      if (input) input.click();
+    }
+
+    function setLabRowNote(row, value) {
+      if (getLabRole() === 'doan_kiem_tra') row.doanNote = value;
+      else row.khoaNote = value;
+      const textarea = document.querySelector('.lab-note[data-row-index="' + row.rowIndex + '"]');
+      if (textarea) textarea.value = parseLabNoteEvidence(value).note;
+    }
+
+    function appendLabEvidenceToRow(row, fileName, url) {
+      const parsed = parseLabNoteEvidence(getRowNote(row));
+      parsed.evidences.push({ title: fileName, url: url });
+      setLabRowNote(row, composeLabNoteEvidence(parsed.note, parsed.evidences));
+      lab2429State.dirty = true;
+      updateLabSaveState();
+      updateLabActionBar();
+      renderLab2429();
+    }
+
+    function removeLabEvidence(rowIndex, evidenceIndex) {
+      if (!lab2429State.canWrite) return;
+      syncLabVisibleInputsToState();
+      const row = lab2429State.rows.find(item => Number(item.rowIndex) === Number(rowIndex));
+      if (!row) return;
+      const parsed = parseLabNoteEvidence(getRowNote(row));
+      parsed.evidences.splice(Number(evidenceIndex), 1);
+      setLabRowNote(row, composeLabNoteEvidence(parsed.note, parsed.evidences));
+      lab2429State.dirty = true;
+      updateLabSaveState();
+      renderLab2429();
+    }
+
+    function updateLabUploadProgress(title, text) {
+      if (Swal.isVisible && Swal.isVisible()) {
+        Swal.update({ title: title || 'Đang tải file', text: text || '' });
+      }
+    }
+
+    function handleLabEvidenceFileSelected(input) {
+      const file = input.files && input.files[0];
+      const rowIndex = Number(lab2429State.uploadTargetRowIndex);
+      const row = lab2429State.rows.find(item => Number(item.rowIndex) === rowIndex);
+      if (!file || !row) return;
+      if (file.size > 15 * 1024 * 1024) {
+        Swal.fire('Tệp quá lớn', 'Dung lượng tệp tối đa cho phép là 15MB.', 'warning');
+        input.value = '';
+        return;
+      }
+      syncLabVisibleInputsToState();
+      const uploadFileName = buildLabEvidenceFileName(row, file);
+      const reader = new FileReader();
+      Swal.fire({
+        title: 'Đang chuẩn bị tải file',
+        text: 'Đang đọc tệp từ thiết bị...',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => Swal.showLoading()
+      });
+      reader.onload = function(event) {
+        updateLabUploadProgress('Đang tải file lên Drive', 'File đang được gửi lên kho minh chứng 2429.');
+        if (typeof google === 'undefined') {
+          input.value = '';
+          Swal.fire('Không thể tải file', 'Chưa kết nối được Google Apps Script.', 'error');
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(res => {
+            input.value = '';
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              Swal.fire('Lỗi tải file', res && res.message ? res.message : 'Vui lòng thử lại.', 'error');
+              return;
+            }
+            appendLabEvidenceToRow(row, res.fileName || uploadFileName, res.url || '');
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'success',
+              title: 'Đã gắn minh chứng, nhớ lưu thay đổi',
+              showConfirmButton: false,
+              timer: 2400
+            });
+          })
+          .withFailureHandler(err => {
+            input.value = '';
+            Swal.fire('Lỗi tải file', err && err.message ? err.message : 'Không thể tải file lên Drive. Vui lòng thử lại.', 'error');
+          })
+          .uploadLab2429EvidenceToDrive(event.target.result, uploadFileName, file.type, document.getElementById('lab-dept').value, row.cleanCode || row.code || 'Chung', getSessionToken());
+      };
+      reader.onerror = function() {
+        input.value = '';
+        Swal.fire('Không đọc được file', 'Vui lòng chọn lại tệp hoặc thử với tệp khác.', 'error');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveLab2429() {
+      if (!lab2429State.canWrite || !lab2429State.dirty) return;
+      syncLabVisibleInputsToState();
+      const role = getLabRole();
+      const formData = lab2429State.rows.map(row => ({
+        rowIndex: row.rowIndex,
+        ketQua: role === 'doan_kiem_tra' ? row.doanResult : row.khoaResult,
+        ghiChu: role === 'doan_kiem_tra' ? row.doanNote : row.khoaNote
+      }));
+      const btn = document.getElementById('btn-lab-save');
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(res => {
+          btn.disabled = false;
+          btn.classList.remove('ring-4', 'ring-emerald-100');
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            Swal.fire('Kh\u00f4ng l\u01b0u \u0111\u01b0\u1ee3c', res && res.message ? res.message : 'L\u1ed7i l\u01b0u b\u1ea3ng ki\u1ec3m.', 'error');
+            return;
+          }
+          lab2429State.dirty = false;
+          updateLabSaveState();
+          Swal.fire('\u0110\u00e3 l\u01b0u', res.message || '\u0110\u00e3 l\u01b0u b\u1ea3ng ki\u1ec3m x\u00e9t nghi\u1ec7m.', 'success');
+          loadLab2429Checklist(true);
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false;
+          Swal.fire('L\u1ed7i k\u1ebft n\u1ed1i', err && err.message ? err.message : String(err), 'error');
+        })
+        .saveLab2429Evaluation(getSessionToken(), document.getElementById('lab-dept').value, role, formData);
+    }
+
+    function loadLab2429Report() {
+      const deptName = document.getElementById('lab-dept').value;
+      if (!deptName) return;
+      google.script.run
+        .withSuccessHandler(res => {
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            Swal.fire('Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c b\u00e1o c\u00e1o', res && res.message ? res.message : 'L\u1ed7i b\u00e1o c\u00e1o.', 'error');
+            return;
+          }
+          renderLab2429Report(res.data);
+        })
+        .withFailureHandler(err => Swal.fire('L\u1ed7i k\u1ebft n\u1ed1i', err && err.message ? err.message : String(err), 'error'))
+        .getLab2429Report(getSessionToken(), deptName);
+    }
+
+    function renderLab2429Report(data) {
+      document.getElementById('lab-score-panel').classList.add('hidden');
+      document.getElementById('lab-report-panel').classList.remove('hidden');
+      document.getElementById('lab-report-standard').innerText = labNumber(data.totalStandard);
+      document.getElementById('lab-report-khoa').innerText = labNumber(data.khoaScore);
+      document.getElementById('lab-report-doan').innerText = labNumber(data.doanScore);
+      document.getElementById('lab-report-gap').innerText = labNumber(data.scoreGap);
+      const rows = data.partialOrFail || [];
+      document.getElementById('lab-report-attention').innerHTML = rows.length ? rows.slice(0, 30).map(row => (
+        '<article class="lab-card"><div class="lab-card-main"><div class="lab-code">' + labEscape(row.code) + '</div><div><div class="lab-content-text">' + labEscape(row.content) + '</div><span class="lab-ref">Khoa: ' + labEscape(row.khoaResult || '--') + ' / &#272;o&#224;n: ' + labEscape(row.doanResult || '--') + '</span></div></div></article>'
+      )).join('') : '<div class="text-center text-slate-400 font-bold py-8">Ch&#432;a c&#243; ti&#234;u ch&#237; c&#7847;n ch&#250; &#253;.</div>';
+    }
+
+    let labResizeTimer = null;
+    window.addEventListener('resize', () => {
+      if (!lab2429State.loaded || lab2429State.activeTab !== 'score') return;
+      window.clearTimeout(labResizeTimer);
+      labResizeTimer = window.setTimeout(() => {
+        syncLabVisibleInputsToState();
+        renderLab2429();
+      }, 120);
+    });
+  </script>

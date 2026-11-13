@@ -1,0 +1,911 @@
+<!-- GIAO DIEN DASHBOARD TONG QUAN -->
+<div id="view-dashboard" class="view-section">
+  <header class="bg-[#0f172a] pt-8 px-6 pb-6 shadow-md relative overflow-hidden md:rounded-t-2xl">
+    <span class="material-symbols-outlined absolute -right-4 -top-4 text-[120px] text-white/5 rotate-12 pointer-events-none">dashboard</span>
+    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-[20px] font-black text-white tracking-tight uppercase">Dashboard tổng quan</h1>
+        <p class="text-slate-300 text-[13px] mt-1 font-bold">Theo dõi tiến độ, chênh lệch và các khoa cần xử lý trước</p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="hidden lg:block text-right mr-2">
+          <p class="text-[10px] font-black uppercase text-slate-400">Phạm vi</p>
+          <p class="text-[12px] font-bold text-white max-w-[260px] truncate" id="dashboard-scope">--</p>
+        </div>
+        <button onclick="loadDashboardOverview(true)" id="btn-dashboard-refresh" class="bg-white/10 hover:bg-white/15 text-white px-4 py-2.5 rounded-xl font-black text-[12px] border border-white/10 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer">
+          <span class="material-symbols-outlined text-[18px]">refresh</span> Tải lại
+        </button>
+        <span id="dashboard-refresh-state" class="dashboard-refresh-state hidden"></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="px-4 md:px-6 py-5 w-full max-w-none mx-auto pb-24">
+    <div class="dashboard-kpi-strip">
+      <div class="dashboard-stat-box">
+        <span class="material-symbols-outlined dashboard-stat-icon text-slate-600 bg-slate-100">fact_check</span>
+        <div>
+          <p class="dashboard-stat-label">Tiêu chí</p>
+          <p class="dashboard-stat-value" id="dash-stat-total">0</p>
+        </div>
+      </div>
+      <div class="dashboard-stat-box">
+        <span class="material-symbols-outlined dashboard-stat-icon text-emerald-600 bg-emerald-50">domain</span>
+        <div>
+          <p class="dashboard-stat-label">Khoa</p>
+          <p class="dashboard-stat-value text-emerald-700" id="dash-stat-khoa">0</p>
+        </div>
+      </div>
+      <div class="dashboard-stat-box">
+        <span class="material-symbols-outlined dashboard-stat-icon text-teal-600 bg-teal-50">task_alt</span>
+        <div>
+          <p class="dashboard-stat-label">Đơn vị xong</p>
+          <p class="dashboard-stat-value text-teal-700" id="dash-stat-bv">0/0</p>
+        </div>
+      </div>
+      <div class="dashboard-stat-box" id="dash-stat-box-doan">
+        <span class="material-symbols-outlined dashboard-stat-icon text-blue-600 bg-blue-50">verified_user</span>
+        <div>
+          <p class="dashboard-stat-label">Đoàn xong</p>
+          <p class="dashboard-stat-value text-blue-700" id="dash-stat-doan">0/0</p>
+        </div>
+      </div>
+      <div class="dashboard-stat-box" id="dash-stat-box-diff">
+        <span class="material-symbols-outlined dashboard-stat-icon text-amber-600 bg-amber-50">difference</span>
+        <div>
+          <p class="dashboard-stat-label">Chênh lệch</p>
+          <p class="dashboard-stat-value text-amber-700" id="dash-stat-diff">0</p>
+        </div>
+      </div>
+      <div class="dashboard-stat-box" id="dash-stat-box-updated">
+        <span class="material-symbols-outlined dashboard-stat-icon text-indigo-600 bg-indigo-50">schedule</span>
+        <div class="min-w-0">
+          <p class="dashboard-stat-label">Cập nhật</p>
+          <p class="dashboard-stat-value text-[15px] truncate" id="dash-stat-updated">--</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="dashboard-loading" class="hidden bg-white rounded-2xl border border-gray-200 min-h-[360px] items-center justify-center flex-col text-slate-500">
+      <span class="material-symbols-outlined animate-spin text-[42px] text-emerald-600">sync</span>
+      <p class="font-bold mt-2 text-[13px]">Đang dựng dashboard tổng quan...</p>
+    </div>
+
+    <div id="dashboard-empty" class="hidden bg-white rounded-2xl border border-dashed border-gray-200 min-h-[360px] items-center justify-center flex-col text-slate-500">
+      <span class="material-symbols-outlined text-[42px] text-slate-400">inbox</span>
+      <p class="font-black mt-2 text-[14px] text-slate-700">Chưa có dữ liệu để tổng quan.</p>
+      <p class="font-bold mt-1 text-[12px] text-slate-400">Hãy tạo dữ liệu đánh giá hoặc kiểm tra phân quyền khoa.</p>
+    </div>
+
+    <div id="dashboard-content" class="hidden dashboard-grid">
+      <section class="dashboard-panel dashboard-exec-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Tiến độ hồ sơ</p>
+            <h2 class="dashboard-panel-title">Mức hoàn thành</h2>
+          </div>
+          <span class="material-symbols-outlined dashboard-panel-icon text-emerald-600 bg-emerald-50">stacked_bar_chart</span>
+        </div>
+
+        <div class="dashboard-progress-visual">
+          <div class="dashboard-donut-wrap">
+            <div id="dash-doan-donut" class="dashboard-donut" style="--value:0">
+              <div class="dashboard-donut-hole">
+                <strong id="dash-doan-donut-value">0%</strong>
+                <span>Đoàn</span>
+              </div>
+            </div>
+            <div class="dashboard-donut-caption" id="dash-doan-donut-caption">0/0 tiêu chí</div>
+          </div>
+          <div class="dashboard-progress-list">
+          <div>
+            <div class="dashboard-progress-meta">
+              <span>Đơn vị tự chấm</span>
+              <strong id="dash-progress-bv-text">0%</strong>
+            </div>
+            <div class="dashboard-progress-track"><div id="dash-progress-bv" class="dashboard-progress-fill bg-emerald-500"></div></div>
+          </div>
+          <div>
+            <div class="dashboard-progress-meta">
+              <span>Đoàn kiểm tra</span>
+              <strong id="dash-progress-doan-text">0%</strong>
+            </div>
+            <div class="dashboard-progress-track"><div id="dash-progress-doan" class="dashboard-progress-fill bg-blue-500"></div></div>
+          </div>
+          <div>
+            <div class="dashboard-progress-meta">
+              <span>Xong cả hai bên</span>
+              <strong id="dash-progress-done-text">0%</strong>
+            </div>
+            <div class="dashboard-progress-track"><div id="dash-progress-done" class="dashboard-progress-fill bg-slate-800"></div></div>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-panel dashboard-exec-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Điểm tổng</p>
+            <h2 class="dashboard-panel-title">Đơn vị và Đoàn</h2>
+          </div>
+          <span class="material-symbols-outlined dashboard-panel-icon text-blue-600 bg-blue-50">monitoring</span>
+        </div>
+
+        <div class="dashboard-score-stack">
+          <div class="dashboard-score-row">
+            <span>Đơn vị</span>
+            <strong id="dash-score-bv-text">0 / 0</strong>
+          </div>
+          <div class="dashboard-progress-track"><div id="dash-score-bv" class="dashboard-progress-fill bg-emerald-500"></div></div>
+          <div class="dashboard-score-row">
+            <span>Đoàn</span>
+            <strong id="dash-score-doan-text">0 / 0</strong>
+          </div>
+          <div class="dashboard-progress-track"><div id="dash-score-doan" class="dashboard-progress-fill bg-blue-500"></div></div>
+          <div class="dashboard-gap-box">
+            <span>Chênh điểm Đoàn - Đơn vị</span>
+            <strong id="dash-score-gap">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-panel dashboard-activity-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Gần đây</p>
+            <h2 class="dashboard-panel-title" id="dash-activity-title">Hoạt động</h2>
+          </div>
+          <span class="material-symbols-outlined dashboard-panel-icon text-violet-600 bg-violet-50">history</span>
+        </div>
+        <div id="dash-activity-list" class="dashboard-activity-list"></div>
+      </section>
+
+      <section class="dashboard-panel dashboard-ops-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Trạng thái</p>
+            <h2 class="dashboard-panel-title">Luồng chấm</h2>
+          </div>
+          <span class="material-symbols-outlined dashboard-panel-icon text-amber-600 bg-amber-50">account_tree</span>
+        </div>
+        <div id="dash-status-stack" class="dashboard-status-stack"></div>
+        <div id="dash-status-list" class="dashboard-status-list"></div>
+      </section>
+
+      <section class="dashboard-panel dashboard-ops-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Phòng phụ trách</p>
+            <h2 class="dashboard-panel-title">Khối lượng</h2>
+          </div>
+          <span class="material-symbols-outlined dashboard-panel-icon text-cyan-600 bg-cyan-50">assignment_ind</span>
+        </div>
+        <div id="dash-phong-list" class="dashboard-phong-bars"></div>
+      </section>
+
+      <section class="dashboard-panel dashboard-action-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Ưu tiên ngay</p>
+            <h2 class="dashboard-panel-title">Việc cần làm ngay</h2>
+          </div>
+          <div class="dashboard-data-pill" id="dash-data-freshness">--</div>
+        </div>
+        <div id="dash-action-list" class="dashboard-action-list"></div>
+        <div id="dash-data-status" class="dashboard-data-status"></div>
+      </section>
+
+      <section class="dashboard-panel dashboard-bottom-panel dashboard-priority-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Ưu tiên xử lý</p>
+            <h2 class="dashboard-panel-title">Khoa cần chú ý</h2>
+          </div>
+          <button type="button" onclick="openDashboardResult('')" class="dashboard-link-btn">
+            <span class="material-symbols-outlined text-[17px]">insert_chart</span> Xem k&#7871;t qu&#7843;
+          </button>
+        </div>
+        <div class="dashboard-table-wrap dashboard-priority-table">
+          <table class="dashboard-table min-w-[760px]">
+            <thead>
+              <tr>
+                <th>Khoa</th>
+                <th class="text-center">Đơn vị</th>
+                <th class="text-center">Đoàn</th>
+                <th class="text-center">Chênh</th>
+                <th class="text-center">Còn lại</th>
+                <th class="text-center">Xem</th>
+              </tr>
+            </thead>
+            <tbody id="dash-department-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="dashboard-panel dashboard-bottom-panel dashboard-attention-panel">
+        <div class="dashboard-panel-head">
+          <div>
+            <p class="dashboard-eyebrow">Danh sách nóng</p>
+            <h2 class="dashboard-panel-title">Tiêu chí cần theo dõi</h2>
+          </div>
+          <button type="button" onclick="openDashboardResult('')" class="dashboard-link-btn">
+            <span class="material-symbols-outlined text-[17px]">insert_chart</span> Xem k&#7871;t qu&#7843;
+          </button>
+        </div>
+        <div class="dashboard-table-wrap dashboard-attention-table">
+          <table class="dashboard-table min-w-[860px]">
+            <thead>
+              <tr>
+                <th>Khoa</th>
+                <th class="text-center">Mã TC</th>
+                <th>Nội dung</th>
+                <th>Phòng</th>
+                <th>Lý do</th>
+              </tr>
+            </thead>
+            <tbody id="dash-attention-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <style>
+    #view-dashboard .dashboard-kpi-strip {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+      width: 100%;
+      align-items: stretch;
+    }
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 14px;
+    }
+    @media (min-width: 1280px) {
+      #view-dashboard .dashboard-kpi-strip {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+      .dashboard-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+      .dashboard-exec-panel,
+      .dashboard-ops-panel,
+      .dashboard-action-panel {
+        grid-column: span 2;
+      }
+      .dashboard-activity-panel {
+        grid-column: span 2;
+      }
+      .dashboard-bottom-panel {
+        grid-column: span 3;
+      }
+    }
+    @media (max-width: 767px) {
+      #view-dashboard .dashboard-kpi-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+    }
+    .dashboard-stat-box,
+    .dashboard-panel {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+      min-width: 0;
+    }
+    #view-dashboard .dashboard-stat-box {
+      width: 100%;
+      min-width: 0;
+      min-height: 70px;
+      padding: 10px 12px;
+      display: flex !important;
+      align-items: center;
+      gap: 10px;
+    }
+    .dashboard-stat-icon,
+    .dashboard-panel-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .dashboard-stat-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      font-size: 19px;
+    }
+    .dashboard-stat-label,
+    .dashboard-eyebrow {
+      color: #94a3b8;
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .dashboard-stat-value {
+      color: #0f172a;
+      font-size: 19px;
+      line-height: 1.2;
+      font-weight: 900;
+      margin-top: 2px;
+    }
+    .dashboard-stat-box.dashboard-stat-alert {
+      border-color: #fbbf24;
+      background: #fffbeb;
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.16), 0 8px 24px rgba(245, 158, 11, 0.08);
+    }
+    .dashboard-stat-box.dashboard-stat-danger {
+      border-color: #fecdd3;
+      background: #fff1f2;
+      box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.10), 0 8px 24px rgba(225, 29, 72, 0.08);
+    }
+    .dashboard-panel {
+      padding: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .dashboard-exec-panel {
+      height: 270px;
+      min-height: 0;
+    }
+    .dashboard-ops-panel,
+    .dashboard-action-panel,
+    .dashboard-activity-panel {
+      height: 270px;
+      min-height: 0;
+    }
+    .dashboard-bottom-panel {
+      height: 360px;
+      min-height: 0;
+    }
+    .dashboard-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .dashboard-panel-title {
+      color: #0f172a;
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1.25;
+      margin-top: 2px;
+    }
+    .dashboard-panel-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 13px;
+      font-size: 22px;
+    }
+    .dashboard-refresh-state {
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .dashboard-refresh-state.is-ok {
+      color: #86efac;
+    }
+    .dashboard-refresh-state.is-error {
+      color: #fecaca;
+    }
+    .dashboard-action-panel {
+      min-height: 0;
+    }
+    .dashboard-action-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+      padding-right: 2px;
+    }
+    .dashboard-action-item {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 13px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .dashboard-action-item:hover {
+      background: #ffffff;
+      border-color: #10b981;
+      transform: translateY(-1px);
+    }
+    .dashboard-action-title {
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .dashboard-action-meta {
+      margin-top: 7px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .dashboard-data-pill,
+    .dashboard-action-badge,
+    .dashboard-data-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+    .dashboard-data-pill {
+      min-height: 30px;
+      padding: 0 10px;
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+      white-space: nowrap;
+    }
+    .dashboard-data-pill.is-stale {
+      background: #fff7ed;
+      color: #c2410c;
+      border-color: #fed7aa;
+    }
+    .dashboard-action-badge {
+      min-height: 24px;
+      padding: 0 8px;
+      background: #ffffff;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+    }
+    .dashboard-action-badge.is-hot {
+      background: #fff7ed;
+      color: #c2410c;
+      border-color: #fed7aa;
+    }
+    .dashboard-action-badge.is-diff {
+      background: #fffbeb;
+      color: #b45309;
+      border-color: #fde68a;
+    }
+    .dashboard-data-status {
+      margin-top: 12px;
+      min-height: 28px;
+      padding: 0 10px;
+      align-self: flex-start;
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+    }
+    .dashboard-data-status.is-stale {
+      background: #fff7ed;
+      color: #c2410c;
+      border-color: #fed7aa;
+    }
+    .dashboard-progress-list,
+    .dashboard-score-stack,
+    .dashboard-status-list,
+    .dashboard-mini-list,
+    .dashboard-phong-bars,
+    .dashboard-activity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dashboard-progress-visual {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+      flex: 1;
+      min-height: 0;
+    }
+    .dashboard-donut-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+    }
+    .dashboard-donut {
+      width: 112px;
+      height: 112px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(#2563eb calc(var(--value, 0) * 1%), #e2e8f0 0);
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
+    }
+    .dashboard-donut-hole {
+      width: 76px;
+      height: 76px;
+      border-radius: inherit;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+    .dashboard-donut-hole strong {
+      color: #0f172a;
+      font-size: 21px;
+      line-height: 1;
+      font-weight: 900;
+    }
+    .dashboard-donut-hole span,
+    .dashboard-donut-caption {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+    .dashboard-donut-caption {
+      margin-top: 9px;
+      text-align: center;
+    }
+    .dashboard-status-stack {
+      display: flex;
+      width: 100%;
+      height: 18px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      flex-shrink: 0;
+      margin-bottom: 2px;
+    }
+    .dashboard-status-segment {
+      height: 100%;
+      min-width: 2px;
+    }
+    .dashboard-status-legend-row {
+      display: grid;
+      grid-template-columns: 10px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .dashboard-status-legend-row:last-child {
+      border-bottom: none;
+    }
+    .dashboard-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+    .dashboard-phong-bars {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .dashboard-phong-row {
+      display: grid;
+      grid-template-columns: minmax(80px, 128px) minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .dashboard-phong-row:last-child {
+      border-bottom: none;
+    }
+    .dashboard-phong-name {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dashboard-phong-track {
+      height: 10px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .dashboard-phong-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: #2563eb;
+    }
+    .dashboard-phong-meta {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .dashboard-table-wrap,
+    .dashboard-status-list,
+    .dashboard-mini-list,
+    .dashboard-activity-list {
+      flex: 1;
+      min-height: 0;
+    }
+    .dashboard-status-list,
+    .dashboard-mini-list,
+    .dashboard-activity-list {
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .dashboard-progress-meta,
+    .dashboard-score-row,
+    .dashboard-gap-box,
+    .dashboard-status-row,
+    .dashboard-mini-row,
+    .dashboard-activity-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+    .dashboard-progress-meta,
+    .dashboard-score-row {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+    .dashboard-progress-meta strong,
+    .dashboard-score-row strong {
+      color: #0f172a;
+      font-weight: 900;
+    }
+    .dashboard-progress-track {
+      width: 100%;
+      height: 9px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      overflow: hidden;
+    }
+    .dashboard-progress-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 999px;
+      transform: scaleX(0);
+      transform-origin: left center;
+      transition: transform 0.25s ease;
+    }
+    #dash-progress-bv,
+    #dash-score-bv {
+      background: #10b981 !important;
+    }
+    #dash-progress-doan,
+    #dash-score-doan {
+      background: #2563eb !important;
+    }
+    #dash-progress-done {
+      background: #0f172a !important;
+    }
+    .dashboard-gap-box {
+      margin-top: 2px;
+      padding: 12px;
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .dashboard-gap-box strong {
+      color: #0f172a;
+      font-size: 18px;
+      font-weight: 900;
+    }
+    .dashboard-status-row,
+    .dashboard-mini-row,
+    .dashboard-activity-row {
+      padding: 10px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .dashboard-status-row:last-child,
+    .dashboard-mini-row:last-child,
+    .dashboard-activity-row:last-child {
+      border-bottom: none;
+    }
+    .dashboard-status-label,
+    .dashboard-mini-title,
+    .dashboard-activity-title {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1.35;
+      min-width: 0;
+    }
+    .dashboard-status-value,
+    .dashboard-mini-meta,
+    .dashboard-activity-meta {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .dashboard-table-wrap {
+      overflow: auto;
+      max-height: none;
+      border: 1px solid #eef2f7;
+      border-radius: 14px;
+    }
+    .dashboard-priority-table {
+      max-height: none;
+    }
+    .dashboard-attention-table {
+      max-height: none;
+    }
+    .dashboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 12px;
+    }
+    .dashboard-table thead tr {
+      background: #f8fafc;
+      color: #64748b;
+      text-transform: uppercase;
+      font-size: 10px;
+      font-weight: 900;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .dashboard-table th,
+    .dashboard-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+    .dashboard-table tbody tr:hover {
+      background: #f8fafc;
+    }
+    .dashboard-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 50px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      border: 1px solid transparent;
+    }
+    .dashboard-link-btn {
+      min-height: 34px;
+      padding: 0 11px;
+      border-radius: 11px;
+      background: #0f172a;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 900;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .dashboard-link-btn:hover {
+      background: #047857;
+    }
+    .dashboard-empty-row {
+      padding: 18px;
+      color: #94a3b8;
+      text-align: center;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    @media (max-width: 767px) {
+      #view-dashboard header h1 {
+        font-size: 18px;
+        line-height: 1.25;
+      }
+      #view-dashboard header p {
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      #view-dashboard > div {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        padding-top: 14px !important;
+      }
+      #view-dashboard .dashboard-stat-box {
+        min-height: 62px;
+        padding: 9px;
+        gap: 8px;
+        border-radius: 12px;
+      }
+      .dashboard-stat-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        font-size: 18px;
+      }
+      .dashboard-stat-label {
+        font-size: 9px;
+      }
+      .dashboard-stat-value {
+        font-size: 16px;
+      }
+      .dashboard-panel {
+        padding: 13px;
+        border-radius: 12px;
+      }
+      .dashboard-panel-head {
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .dashboard-panel-title {
+        font-size: 14px;
+      }
+      .dashboard-panel-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+        font-size: 20px;
+      }
+      .dashboard-link-btn {
+        min-height: 32px;
+        padding: 0 9px;
+        font-size: 10px;
+        max-width: 148px;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.2;
+      }
+      .dashboard-exec-panel,
+      .dashboard-ops-panel,
+      .dashboard-action-panel,
+      .dashboard-activity-panel,
+      .dashboard-bottom-panel {
+        height: auto;
+        min-height: auto;
+      }
+      .dashboard-progress-visual {
+        grid-template-columns: 1fr;
+      }
+      .dashboard-donut {
+        width: 104px;
+        height: 104px;
+      }
+      .dashboard-phong-row {
+        grid-template-columns: minmax(70px, 104px) minmax(0, 1fr);
+      }
+      .dashboard-phong-meta {
+        grid-column: 2;
+      }
+      .dashboard-table-wrap,
+      .dashboard-priority-table,
+      .dashboard-attention-table {
+        max-height: 340px;
+      }
+      .dashboard-table th,
+      .dashboard-table td {
+        padding: 9px 10px;
+      }
+      .dashboard-status-label,
+      .dashboard-mini-title,
+      .dashboard-activity-title {
+        font-size: 11px;
+      }
+    }
+  </style>
+
+  
+</div>

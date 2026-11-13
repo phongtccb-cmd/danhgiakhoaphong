@@ -1,0 +1,1507 @@
+<!-- 311_Controller_Checklist.html: client-side behavior for 310_ChecklistView.html. -->
+<script>
+    // BIẾN TOÀN CỤC PHỤC VỤ MASTER-DETAIL & UPLOAD
+    let currentCriteriaList = []; 
+    let currentDetailItems = [];  
+    let activeIdKetQua = null;    
+    let activeMaGop = null;
+    let activeUploadItemId = null; // Lưu ID dòng tiểu mục đang chọn upload file
+    let activeEvidenceManagerItemId = null;
+    let checklistPhongOptions = [];
+    let checklistConfigInitialized = false;
+    let checklistCurrentPage = 1;
+    let checklistPageSize = 10;
+    let modalOpenLevels = {};
+    const CHECKLIST_CLIENT_CACHE_TTL_MS = 45000;
+    const checklistClientCache = {};
+
+    // ==========================================
+    // 1. KHỞI TẠO MÀN HÌNH CHÍNH (MASTER TABLE)
+    // ==========================================
+    function normalizeChecklistText(value) {
+      return String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd');
+    }
+
+    function sameChecklistText(a, b) {
+      return normalizeChecklistText(a) === normalizeChecklistText(b);
+    }
+
+    function isChecklistDoanKT() {
+      return currentUser && (currentUser.activeRole || currentUser.role) === 'DoanKT';
+    }
+
+    function isChecklistKhoaOnly() {
+      return currentUser && (currentUser.activeRole || currentUser.role) === 'Khoa';
+    }
+
+    function getChecklistClientCacheKey() {
+      const userKey = currentUser && currentUser.username ? currentUser.username : 'guest';
+      const khoa = currentConfig && currentConfig.khoa ? currentConfig.khoa : '';
+      const phong = currentConfig && currentConfig.phong ? currentConfig.phong : 'All';
+      return [userKey, normalizeChecklistText(khoa), normalizeChecklistText(phong)].join('|');
+    }
+
+    function getFreshChecklistClientCache() {
+      const entry = checklistClientCache[getChecklistClientCacheKey()];
+      if (!entry || !entry.data || Date.now() - entry.cachedAtMs > CHECKLIST_CLIENT_CACHE_TTL_MS) return null;
+      return entry.data;
+    }
+
+    function setChecklistClientCache(data) {
+      checklistClientCache[getChecklistClientCacheKey()] = {
+        data: data || [],
+        cachedAtMs: Date.now()
+      };
+    }
+
+    function invalidateChecklistClientCache() {
+      delete checklistClientCache[getChecklistClientCacheKey()];
+    }
+
+    function getChecklistScoreValueForRole(item, role) {
+      if (!item) return "";
+      if (role === 'doan') {
+        if (item.diemtc_doan !== undefined && item.diemtc_doan !== "") return String(item.diemtc_doan);
+        if (item.diem_doan !== undefined && item.diem_doan !== "") return String(item.diem_doan);
+        if (item.diem !== undefined && item.diem !== "") return String(item.diem);
+        return "";
+      }
+      if (item.diemtc_bv !== undefined && item.diemtc_bv !== "") return String(item.diemtc_bv);
+      if (item.diemtc !== undefined && item.diemtc !== "") return String(item.diemtc);
+      return "";
+    }
+
+    function calculateChecklistScoreForRole(items, role) {
+      const list = Array.isArray(items) ? items : [];
+      if (list.length === 0) return 0;
+      const hasScored = list.some(item => getChecklistScoreValueForRole(item, role) !== "");
+      if (!hasScored) return 0;
+
+      const levels = { 2: [], 3: [], 4: [], 5: [] };
+      list.forEach(item => {
+        if (levels[item.mucdo]) levels[item.mucdo].push(getChecklistScoreValueForRole(item, role));
+      });
+
+      const passLevel = levelItems => levelItems.length > 0 && levelItems.every(value => value === "1");
+      if (!passLevel(levels[2])) return 1;
+      if (!passLevel(levels[3])) return 2;
+      if (!passLevel(levels[4])) return 3;
+      if (!passLevel(levels[5])) return 4;
+      return 5;
+    }
+
+    function applySavedChecklistChangesToClient() {
+      const target = currentCriteriaList.find(item => item.id_ketqua === activeIdKetQua && sameChecklistText(item.magop, activeMaGop))
+        || currentCriteriaList.find(item => item.id_ketqua === activeIdKetQua);
+      if (!target) return;
+
+      target.ChiTiet = JSON.parse(JSON.stringify(currentDetailItems || []));
+      target.diemBV = calculateChecklistScoreForRole(target.ChiTiet, 'bv');
+      target.diemDoan = calculateChecklistScoreForRole(target.ChiTiet, 'doan');
+      setChecklistClientCache(currentCriteriaList);
+      renderMasterTable();
+    }
+
+    function uniqueChecklistValues(values) {
+      const seen = {};
+      const result = [];
+      values.forEach(value => {
+        const text = String(value || '').trim();
+        const key = normalizeChecklistText(text);
+        if (text && !seen[key]) {
+          seen[key] = true;
+          result.push(text);
+        }
+      });
+      return result;
+    }
+
+    function escapeChecklistHtml(value) {
+      return window.App.utils.escapeHtml(value || '');
+    }
+
+    function getChecklistEvidenceText(value) {
+      return typeof value === 'string' ? value : '';
+    }
+
+    function trimChecklistEvidenceUrl(url) {
+      return String(url || '').replace(/[)\].,;]+$/, '');
+    }
+
+    function getChecklistEvidenceUrl(value) {
+      const text = getChecklistEvidenceText(value).trim();
+      if (!text) return '';
+
+      const absoluteMatch = text.match(/https?:\/\/[^\s"'<>]+/i);
+      if (absoluteMatch) return trimChecklistEvidenceUrl(absoluteMatch[0]);
+
+      const driveMatch = text.match(/(?:^|\s)(drive\.google\.com\/[^\s"'<>]+)/i);
+      if (driveMatch) return 'https://' + trimChecklistEvidenceUrl(driveMatch[1]);
+
+      return '';
+    }
+
+    function getChecklistEvidenceRoleSuffix() {
+      return isChecklistDoanKT() ? 'doan' : 'bv';
+    }
+
+    function getChecklistEvidenceArrayKey() {
+      return getChecklistEvidenceRoleSuffix() === 'doan' ? 'evidences_doan' : 'evidences_bv';
+    }
+
+    function getChecklistEvidenceNoteKey() {
+      return getChecklistEvidenceRoleSuffix() === 'doan' ? 'minhchung_doan' : 'minhchung_bv';
+    }
+
+    function getChecklistEvidenceList(item) {
+      const key = getChecklistEvidenceArrayKey();
+      if (!item[key] || !Array.isArray(item[key])) item[key] = [];
+      return item[key];
+    }
+
+    function getChecklistLegacyEvidenceText(item) {
+      if (!item) return '';
+      if (getChecklistEvidenceRoleSuffix() === 'doan') return getChecklistEvidenceText(item.minhchung_doan);
+      return getChecklistEvidenceText(item.minhchung_bv !== undefined ? item.minhchung_bv : item.Minhchung);
+    }
+
+    function getChecklistEvidenceCount(item) {
+      const listCount = getChecklistEvidenceList(item).length;
+      const legacyText = getChecklistLegacyEvidenceText(item).trim();
+      return listCount + (legacyText ? 1 : 0);
+    }
+
+    function createChecklistEvidenceRecord(data) {
+      const now = new Date();
+      const rawTitle = data && data.title ? data.title : '';
+      const rawUrl = data && data.url ? data.url : '';
+      const rawNote = data && data.note ? data.note : '';
+      return {
+        id: 'ev_' + now.getTime() + '_' + Math.floor(Math.random() * 100000),
+        title: String(rawTitle || rawUrl || rawNote || 'Minh chứng').trim(),
+        url: String(rawUrl || '').trim(),
+        type: String(data && data.type || (rawUrl ? 'link' : 'note')).trim(),
+        note: String(rawNote || '').trim(),
+        uploadedBy: currentUser && (currentUser.name || currentUser.username) ? (currentUser.name || currentUser.username) : '',
+        uploadedAt: now.toISOString()
+      };
+    }
+
+    function formatChecklistEvidenceDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleString('vi-VN');
+    }
+
+    function findChecklistDetailItem(itemId) {
+      return currentDetailItems.find(item => sameChecklistText(item.id, itemId));
+    }
+
+    function getChecklistAssignedPhongs(khoa) {
+      const assignments = Array.isArray(currentUser && currentUser.phanCong) ? currentUser.phanCong : [];
+      const phongs = assignments
+        .filter(item => !khoa || !item.khoa || sameChecklistText(item.khoa, 'All') || sameChecklistText(item.khoa, khoa))
+        .map(item => item.phong)
+        .filter(phong => phong && !sameChecklistText(phong, 'All'));
+      return uniqueChecklistValues(phongs);
+    }
+
+    function renderChecklistPhongOptions(khoa) {
+      const selectPhong = document.getElementById('checklist-phong');
+      const previousValue = currentConfig && currentConfig.phong ? currentConfig.phong : selectPhong.value;
+      const assignedPhongs = getChecklistAssignedPhongs(khoa);
+      let options = checklistPhongOptions || [];
+
+      if (assignedPhongs.length > 0) {
+        options = options.filter(option => assignedPhongs.some(phong => sameChecklistText(phong, option.value)));
+      }
+
+      if (options.length === 0) {
+        selectPhong.innerHTML = `<option value="">Không có phòng phụ trách phù hợp</option>`;
+        updateChecklistConfigInsights();
+        return;
+      }
+
+      let html = `<option value="">-- Chọn Phòng Chuyên Môn --</option>`;
+      options.forEach(option => {
+        html += `<option value="${escapeChecklistHtml(option.value)}">${escapeChecklistHtml(option.label || option.value)}</option>`;
+      });
+      selectPhong.innerHTML = html;
+
+      if (previousValue && options.some(option => sameChecklistText(option.value, previousValue))) {
+        selectPhong.value = previousValue;
+      } else if (options.length === 1) {
+        selectPhong.value = options[0].value;
+      }
+      updateChecklistConfigInsights();
+    }
+
+    function updateChecklistConfigSummary() {
+      const summary = document.getElementById('checklist-config-summary');
+      if (!summary) return;
+
+      const khoa = currentConfig && currentConfig.khoa ? currentConfig.khoa : 'Chưa chọn khoa';
+      const phong = currentConfig && currentConfig.phong ? currentConfig.phong : 'Chưa chọn phòng';
+      summary.innerText = khoa + ' / ' + phong;
+    }
+
+    function setChecklistCriteriaTotal(value) {
+      const totalEl = document.getElementById('config-total-criteria');
+      if (!totalEl) return;
+      totalEl.innerText = value === null || value === undefined || value === '' ? '--' : value;
+    }
+
+    function updateChecklistConfigInsights() {
+      const countEl = document.getElementById('config-assigned-count');
+      const listEl = document.getElementById('config-assigned-phongs');
+      if (!countEl || !listEl) return;
+
+      const selectKhoa = document.getElementById('checklist-khoa');
+      const khoa = (selectKhoa && selectKhoa.value) || (currentConfig && currentConfig.khoa) || '';
+      const assignedPhongs = getChecklistAssignedPhongs(khoa);
+
+      if (assignedPhongs.length > 0) {
+        countEl.innerText = assignedPhongs.length;
+        listEl.innerHTML = assignedPhongs.map(phong => (
+          `<span class="checklist-assigned-chip" title="${escapeChecklistHtml(phong)}">${escapeChecklistHtml(phong)}</span>`
+        )).join('');
+        return;
+      }
+
+      if (isChecklistKhoaOnly()) {
+        countEl.innerHTML = 'T&#7845;t c&#7843;';
+        listEl.innerHTML = '<span class="checklist-assigned-chip">To&#224;n b&#7897; ti&#234;u ch&iacute;</span>';
+        return;
+      }
+
+      countEl.innerText = '--';
+      listEl.innerHTML = '<span class="checklist-assigned-empty">Ch&#7885;n khoa &#273;&#7875; xem ph&acirc;n c&ocirc;ng</span>';
+    }
+
+    function loadChecklistPhongOptions(khoaDangChon) {
+      const selectPhong = document.getElementById('checklist-phong');
+      selectPhong.disabled = true;
+      selectPhong.innerHTML = `<option value="">-- Đang tải danh sách Phòng... --</option>`;
+
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(res => {
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+            checklistPhongOptions = res.data;
+            renderChecklistPhongOptions(khoaDangChon);
+          } else {
+            selectPhong.innerHTML = `<option value="">Lỗi: Không tải được danh sách phòng</option>`;
+          }
+          selectPhong.disabled = false;
+        }).getDanhSachPhongPhuTrach(getSessionToken(), khoaDangChon);
+      }
+    }
+
+    function initChecklistConfigUI() {
+      const selectKhoa = document.getElementById('checklist-khoa');
+      const selectPhong = document.getElementById('checklist-phong');
+      if (!selectKhoa || !selectPhong) return;
+
+      if (isChecklistKhoaOnly()) {
+        const khoaCuaToi = (currentUser.quyenTruyCap || [])[0] || '';
+        selectKhoa.innerHTML = `<option value="${escapeChecklistHtml(khoaCuaToi)}">${escapeChecklistHtml(khoaCuaToi)}</option>`;
+        selectKhoa.disabled = true;
+        selectPhong.innerHTML = `<option value="All">Tất cả tiêu chí (Tự chấm)</option>`;
+        selectPhong.value = 'All';
+        selectPhong.disabled = true;
+
+        if (!currentConfig.khoa && khoaCuaToi) {
+          currentConfig = { khoa: khoaCuaToi, phong: 'All' };
+        }
+        updateChecklistConfigSummary();
+        updateChecklistConfigInsights();
+        checklistConfigInitialized = true;
+        return;
+      }
+
+      selectKhoa.disabled = false;
+      selectKhoa.onchange = () => {
+        setChecklistCriteriaTotal('--');
+        renderChecklistPhongOptions(selectKhoa.value);
+      };
+      selectPhong.onchange = () => setChecklistCriteriaTotal('--');
+      loadChecklistPhongOptions(currentConfig && currentConfig.khoa ? currentConfig.khoa : '');
+
+      if (!checklistConfigInitialized) {
+        selectKhoa.innerHTML = `<option value="">-- Đang tải danh sách Khoa... --</option>`;
+        if (typeof google !== 'undefined') {
+          google.script.run
+            .withFailureHandler(err => {
+              selectKhoa.innerHTML = `<option value="">Loi: ${escapeChecklistHtml(err && err.message ? err.message : 'Khong tai duoc danh sach')}</option>`;
+            })
+            .withSuccessHandler(res => {
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (res.success && res.data.length > 0) {
+              let options = `<option value="">-- Chọn Khoa --</option>`;
+              res.data.forEach(khoa => {
+                options += `<option value="${escapeChecklistHtml(khoa)}">${escapeChecklistHtml(khoa)}</option>`;
+              });
+              selectKhoa.innerHTML = options;
+              if (currentConfig && currentConfig.khoa) selectKhoa.value = currentConfig.khoa;
+              renderChecklistPhongOptions(selectKhoa.value);
+              checklistConfigInitialized = true;
+            } else {
+              selectKhoa.innerHTML = `<option value="">Lỗi: Không tải được danh sách</option>`;
+            }
+            })
+            .getDanhSachKhoaTuDepartment(getSessionToken());
+        }
+      } else {
+        if (currentConfig && currentConfig.khoa) selectKhoa.value = currentConfig.khoa;
+        if (currentConfig && currentConfig.phong) selectPhong.value = currentConfig.phong;
+      }
+    }
+
+    function applyChecklistConfig() {
+      const khoa = document.getElementById('checklist-khoa').value;
+      const phong = document.getElementById('checklist-phong').value;
+
+      if (!khoa) { alert("Vui lòng chọn Khoa được đánh giá!"); return; }
+      if (!phong) { alert("Vui lòng chọn Phòng phụ trách!"); return; }
+
+      currentConfig = { khoa: khoa, phong: phong };
+      loadChecklistData();
+    }
+
+    function initCheckListUI() {
+      initChecklistConfigUI();
+
+      if (!currentConfig || !currentConfig.khoa) {
+        document.getElementById('crumb-khoa').innerText = "VUI LÒNG THIẾT LẬP CẤU HÌNH";
+        document.getElementById('crumb-phong').innerText = "--";
+        updateChecklistConfigSummary();
+        updateChecklistConfigInsights();
+        setChecklistCriteriaTotal('--');
+        document.getElementById('checklist-master-box').style.display = 'none';
+        document.getElementById('master-checklist-loading').style.display = 'none';
+        document.getElementById('master-checklist-empty').style.display = 'flex';
+        return;
+      }
+
+      loadChecklistData();
+    }
+
+    function loadChecklistData(forceReload) {
+      document.getElementById('crumb-khoa').innerText = currentConfig.khoa;
+      const tenPhong = currentConfig.phong === 'All' ? "Toàn bộ tiêu chí (Khoa tự chấm)" : currentConfig.phong;
+      document.getElementById('crumb-phong').innerText = tenPhong;
+      updateChecklistConfigSummary();
+      updateChecklistConfigInsights();
+      setChecklistCriteriaTotal('...');
+      const cachedData = forceReload ? null : getFreshChecklistClientCache();
+      if (cachedData) {
+        currentCriteriaList = cachedData;
+        checklistCurrentPage = 1;
+        renderMasterTable();
+        setChecklistCriteriaTotal(cachedData.length);
+        return;
+      }
+      
+      document.getElementById('master-checklist-empty').style.display = 'none';
+      document.getElementById('checklist-master-box').style.display = 'none';
+      document.getElementById('master-checklist-loading').style.display = 'flex';
+
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(res => {
+          document.getElementById('master-checklist-loading').style.display = 'none';
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (res.success && res.data) {
+            currentCriteriaList = res.data;
+            setChecklistClientCache(res.data);
+            checklistCurrentPage = 1;
+            renderMasterTable();
+            setChecklistCriteriaTotal(res.data.length);
+          } else {
+            setChecklistCriteriaTotal('--');
+            document.getElementById('master-checklist-table-body').innerHTML = 
+              '<tr>' +
+                '<td colspan="6" class="p-8 text-center text-red-500 font-bold bg-red-50/50">' +
+                  '<span class="material-symbols-outlined text-[32px] block mb-1">error</span>' +
+                  (res.message || 'Không tìm thấy dữ liệu cấu hình cho bối cảnh này.') +
+                '</td>' +
+              '</tr>';
+            document.getElementById('checklist-master-box').style.display = 'flex';
+          }
+        }).getChecklistMasterData(currentConfig.khoa, currentConfig.phong, getSessionToken());
+      }
+    }
+
+    function getStatusBadge(chiTiet) {
+      const N = chiTiet.length;
+      const C_bv = chiTiet.filter(i => {
+        const d = i.diemtc_bv !== undefined && i.diemtc_bv !== "" ? i.diemtc_bv : (i.diemtc || "");
+        return d !== "";
+      }).length;
+      const C_doan = chiTiet.filter(i => {
+        const d = i.diemtc_doan !== undefined && i.diemtc_doan !== "" ? i.diemtc_doan : (i.diem_doan !== undefined && i.diem_doan !== "" ? i.diem_doan : (i.diem || ""));
+        return d !== "";
+      }).length;
+
+      const isDoanKT = isChecklistDoanKT();
+
+      if (C_bv === 0) {
+        return '<span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-gray-100 text-gray-500 border border-gray-200/50">1. Chưa tự chấm</span>';
+      }
+      if (C_bv > 0 && C_bv < N) {
+        return '<span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-600 border border-amber-200">2. Đang tự chấm (' + C_bv + '/' + N + ')</span>';
+      }
+      if (C_bv === N && C_doan === 0) {
+        if (isDoanKT) {
+          return '<span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-600 border border-blue-200">4. Đoàn chưa chấm</span>';
+        } else {
+          return '<span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-green-50 text-green-600 border border-green-200">3. Đã tự chấm xong</span>';
+        }
+      }
+      if (C_doan > 0 && C_doan < N) {
+        return '<span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-purple-50 text-purple-600 border border-purple-200">5. Đoàn đang chấm (' + C_doan + '/' + N + ')</span>';
+      }
+      if (C_doan === N) {
+        return '<span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-black bg-teal-50 text-teal-600 border border-teal-200">6. Đoàn chấm xong</span>';
+      }
+      return '<span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">N/A</span>';
+    }
+
+    function getChecklistProgressState(item) {
+      const details = Array.isArray(item && item.ChiTiet) ? item.ChiTiet : [];
+      const total = details.length;
+      const bvCount = details.filter(i => {
+        const d = i.diemtc_bv !== undefined && i.diemtc_bv !== "" ? i.diemtc_bv : (i.diemtc || "");
+        return d !== "";
+      }).length;
+      const doanCount = details.filter(i => {
+        const d = i.diemtc_doan !== undefined && i.diemtc_doan !== "" ? i.diemtc_doan : (i.diem_doan !== undefined && i.diem_doan !== "" ? i.diem_doan : (i.diem || ""));
+        return d !== "";
+      }).length;
+
+      if (bvCount === 0) return 'bv-empty';
+      if (bvCount > 0 && bvCount < total) return 'bv-progress';
+      if (doanCount > 0 && doanCount < total) return 'doan-progress';
+      if (doanCount === total && total > 0) return 'doan-done';
+      return 'bv-done';
+    }
+
+    function getFilteredMasterCriteria() {
+      const keywordEl = document.getElementById('checklist-master-search');
+      const statusEl = document.getElementById('checklist-master-status');
+      const keyword = normalizeChecklistText(keywordEl ? keywordEl.value : '');
+      const status = statusEl ? statusEl.value : 'all';
+
+      return currentCriteriaList
+        .map((item, index) => ({ item, index }))
+        .filter(entry => {
+          if (status !== 'all' && getChecklistProgressState(entry.item) !== status) return false;
+          if (!keyword) return true;
+          const haystack = normalizeChecklistText([
+            entry.item.maTC,
+            entry.item.noiDung,
+            entry.item.magop,
+            entry.item.trangThai
+          ].join(' '));
+          return haystack.includes(keyword);
+        });
+    }
+
+    function updateChecklistPager(totalRows, page, pageSize, pageCount) {
+      const summary = document.getElementById('checklist-page-summary');
+      const pageSizeEl = document.getElementById('checklist-page-size');
+      const prevBtn = document.getElementById('checklist-prev-page');
+      const nextBtn = document.getElementById('checklist-next-page');
+      const label = document.getElementById('checklist-page-label');
+      const start = totalRows ? ((page - 1) * pageSize + 1) : 0;
+      const end = totalRows ? Math.min(totalRows, page * pageSize) : 0;
+
+      if (summary) summary.innerText = 'Hiển thị ' + start + '-' + end + ' trong tổng ' + totalRows + ' tiêu chí';
+      if (pageSizeEl) pageSizeEl.value = String(pageSize);
+      if (label) label.innerText = 'Trang ' + page + ' / ' + pageCount;
+      if (prevBtn) prevBtn.disabled = page <= 1;
+      if (nextBtn) nextBtn.disabled = page >= pageCount;
+    }
+
+    function changeChecklistPageSize(value) {
+      checklistPageSize = Math.max(1, parseInt(value, 10) || 10);
+      checklistCurrentPage = 1;
+      renderMasterTable();
+    }
+
+    function changeChecklistPage(delta) {
+      checklistCurrentPage += parseInt(delta, 10) || 0;
+      renderMasterTable();
+    }
+
+    function handleChecklistMasterFilterChange() {
+      checklistCurrentPage = 1;
+      renderMasterTable();
+    }
+
+    function renderMasterTable() {
+      const tbody = document.getElementById('master-checklist-table-body');
+      const mobileList = document.getElementById('checklist-master-mobile-list');
+      const rows = getFilteredMasterCriteria();
+      const totalCount = currentCriteriaList.length;
+      const counter = document.getElementById('master-counter-badge');
+      const totalFiltered = rows.length;
+      const pageCount = Math.max(1, Math.ceil(totalFiltered / checklistPageSize));
+      checklistCurrentPage = Math.min(Math.max(1, checklistCurrentPage), pageCount);
+      const startIndex = (checklistCurrentPage - 1) * checklistPageSize;
+      const pageRows = rows.slice(startIndex, startIndex + checklistPageSize);
+
+      if (!totalCount) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400 italic">Không có tiêu chí phân công nào khả dụng.</td></tr>';
+        if (mobileList) mobileList.innerHTML = '';
+        if (counter) counter.innerText = '0 tiêu chí';
+        updateChecklistPager(0, 1, checklistPageSize, 1);
+        document.getElementById('checklist-master-box').style.display = 'flex';
+        return;
+      }
+
+      if (counter) {
+        counter.innerText = rows.length === totalCount
+          ? 'Tổng cộng: ' + totalCount + ' tiêu chí'
+          : 'Đang lọc: ' + rows.length + '/' + totalCount + ' tiêu chí';
+      }
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400 italic">Không có tiêu chí phù hợp với bộ lọc.</td></tr>';
+        if (mobileList) mobileList.innerHTML = '';
+        updateChecklistPager(0, 1, checklistPageSize, 1);
+        document.getElementById('checklist-master-box').style.display = 'flex';
+        return;
+      }
+
+      updateChecklistPager(totalFiltered, checklistCurrentPage, checklistPageSize, pageCount);
+
+      tbody.innerHTML = pageRows.map(entry => {
+        const item = entry.item;
+        const badgeHTML = getStatusBadge(item.ChiTiet || []);
+        const scoreBVText = item.diemBV > 0 ? (item.diemBV + '/5') : '-';
+        const scoreDoanText = item.diemDoan > 0 ? (item.diemDoan + '/5') : '-';
+
+        return `
+          <tr class="border-b border-gray-200 hover:bg-slate-50/40 transition-colors">
+            <td class="p-3 text-center font-black text-[#16a34a] border-r border-gray-100">${escapeChecklistHtml(item.maTC)}</td>
+            <td class="p-3 font-bold text-gray-800 border-r border-gray-100 max-w-sm truncate" title="${escapeChecklistHtml(item.noiDung)}">
+              ${escapeChecklistHtml(item.noiDung)}
+            </td>
+            <td class="p-3 text-center font-black text-green-700 bg-green-50/5 border-r border-gray-100 text-[13px]">
+              ${scoreBVText}
+            </td>
+            <td class="p-3 text-center font-black text-blue-700 bg-blue-50/5 border-r border-gray-100 text-[13px]">
+              ${scoreDoanText}
+            </td>
+            <td class="p-3 text-center border-r border-gray-100">${badgeHTML}</td>
+            <td class="p-3 text-center">
+              <button onclick="openMarkingModalByIndex(${entry.index})" class="px-3.5 py-1.5 bg-slate-900 hover:bg-green-600 text-white rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-1 mx-auto shadow-sm active:scale-95 cursor-pointer">
+                <span class="material-symbols-outlined text-[15px]">edit_note</span> Chấm điểm
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      if (mobileList) {
+        mobileList.innerHTML = '';
+      }
+
+      document.getElementById('checklist-master-box').style.display = 'flex';
+    }
+
+    function renderMasterMobileCard(item, originalIndex) {
+      const badgeHTML = getStatusBadge(item.ChiTiet || []);
+      const scoreBVText = item.diemBV > 0 ? (item.diemBV + '/5') : '-';
+      const scoreDoanText = item.diemDoan > 0 ? (item.diemDoan + '/5') : '-';
+      return `
+        <article class="checklist-master-mobile-card">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-[11px] font-black text-emerald-700">${escapeChecklistHtml(item.maTC)}</div>
+              <h3 class="mt-1 text-[13px] font-black text-slate-800 leading-snug">${escapeChecklistHtml(item.noiDung)}</h3>
+            </div>
+            <button onclick="openMarkingModalByIndex(${originalIndex})" class="w-10 h-10 rounded-xl bg-slate-900 hover:bg-green-600 text-white inline-flex items-center justify-center transition-all flex-shrink-0 cursor-pointer" title="Chấm điểm">
+              <span class="material-symbols-outlined text-[19px]">edit_note</span>
+            </button>
+          </div>
+          <div class="mt-3">${badgeHTML}</div>
+          <div class="checklist-master-mobile-meta">
+            <div><span>Khoa</span><strong>${scoreBVText}</strong></div>
+            <div><span>Đoàn</span><strong>${scoreDoanText}</strong></div>
+            <div><span>Mục</span><strong>${Array.isArray(item.ChiTiet) ? item.ChiTiet.length : 0}</strong></div>
+          </div>
+        </article>
+      `;
+    }
+
+    // ==========================================
+    // 2. LOGIC MỞ POPUP CHẤM ĐIỂM (OPEN DETAIL)
+    // ==========================================
+    function openMarkingModalByIndex(index) {
+      const item = currentCriteriaList[Number(index)];
+      if (!item) return;
+      openMarkingModal(item.id_ketqua, item.magop);
+    }
+
+    function ensureMarkingModalPortal() {
+      const modal = document.getElementById('marking-modal');
+      if (!modal || modal.parentElement === document.body) return;
+      document.body.appendChild(modal);
+    }
+
+    function applyMobileModalLayout(enabled) {
+      const modal = document.getElementById('marking-modal');
+      const panel = document.getElementById('marking-modal-panel');
+      const body = document.getElementById('marking-modal-body');
+      const isMobile = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+      if (!modal || !panel || !body) return;
+
+      if (enabled && isMobile) {
+        modal.style.position = 'fixed';
+        modal.style.inset = '0';
+        modal.style.width = '100vw';
+        modal.style.height = '100dvh';
+        modal.style.padding = '0';
+        modal.style.overflow = 'hidden';
+
+        panel.style.position = 'fixed';
+        panel.style.inset = '0';
+        panel.style.width = '100vw';
+        panel.style.height = 'auto';
+        panel.style.maxHeight = 'none';
+        panel.style.display = 'flex';
+        panel.style.flexDirection = 'column';
+        panel.style.borderRadius = '0';
+        panel.style.transform = 'none';
+
+        body.style.flex = '1 1 auto';
+        body.style.minHeight = '0';
+        body.style.overflowY = 'auto';
+        body.style.overflowX = 'hidden';
+        console.log('[ezCheck83TC] mobile modal layout', {
+          innerHeight: window.innerHeight,
+          modalHeight: modal.getBoundingClientRect().height,
+          panelHeight: panel.getBoundingClientRect().height
+        });
+        return;
+      }
+
+      ['position', 'inset', 'width', 'height', 'padding', 'overflow'].forEach(prop => {
+        modal.style[prop] = '';
+      });
+      ['position', 'inset', 'width', 'height', 'maxHeight', 'display', 'flexDirection', 'borderRadius', 'transform'].forEach(prop => {
+        panel.style[prop] = '';
+      });
+      ['flex', 'minHeight', 'overflowY', 'overflowX'].forEach(prop => {
+        body.style[prop] = '';
+      });
+    }
+
+    function openMarkingModal(id_ketqua, magop) {
+      ensureMarkingModalPortal();
+      activeIdKetQua = id_ketqua;
+      activeMaGop = magop || null;
+      
+      const item = currentCriteriaList.find(c => c.id_ketqua === id_ketqua && sameChecklistText(c.magop, magop))
+        || currentCriteriaList.find(c => c.id_ketqua === id_ketqua);
+      if(!item) return;
+      activeMaGop = item.magop || activeMaGop;
+
+      document.getElementById('modal-tieu-chi-ma').innerText = "TIÊU CHÍ: " + item.maTC;
+      document.getElementById('modal-tieu-chi-ten').innerText = item.noiDung;
+      
+      currentDetailItems = Array.isArray(item.ChiTiet) ? JSON.parse(JSON.stringify(item.ChiTiet)) : []; 
+      modalOpenLevels = {};
+
+      const isDoanKT = isChecklistDoanKT();
+      const thBv = document.getElementById('th-bv-score');
+      
+      if (isDoanKT) {
+        document.getElementById('modal-btn-sync').classList.remove('hidden');
+        thBv.classList.remove('hidden');
+      } else {
+        document.getElementById('modal-btn-sync').classList.add('hidden');
+        thBv.classList.add('hidden');
+      }
+
+      document.getElementById('marking-modal').classList.remove('hidden');
+      document.getElementById('marking-modal').classList.add('flex');
+      applyMobileModalLayout(true);
+
+      // VƯỢT RÀO CHE PHỦ DI ĐỘNG: Đẩy z-index của khung cha lên trên menu đáy đồng thời ẩn hẳn thanh menu
+      const mainScroll = document.getElementById('main-scroll-area');
+      if (mainScroll) {
+        mainScroll.style.overflow = 'hidden'; 
+      }
+
+      const sideNav = document.getElementById('side-nav');
+      if (sideNav) {
+        sideNav.style.display = 'none';
+      }
+
+      renderModalTable();
+      updateLiveScore();
+    }
+
+    function closeMarkingModal() {
+      document.getElementById('marking-modal').classList.add('hidden');
+      document.getElementById('marking-modal').classList.remove('flex');
+      applyMobileModalLayout(false);
+      activeMaGop = null;
+      
+      // TRẢ LẠI TRẠNG THÁI CUỘN, HIỆN LẠI SIDEBAR BÌNH THƯỜNG
+      const mainScroll = document.getElementById('main-scroll-area');
+      if (mainScroll) {
+        mainScroll.style.overflow = 'auto';
+      }
+
+      const sideNav = document.getElementById('side-nav');
+      if (sideNav) {
+        sideNav.style.display = '';
+      }
+
+      activeIdKetQua = null;
+      currentDetailItems = [];
+    }
+
+    // ==========================================
+    // HÀM HELPER PHỤC VỤ PHƯƠNG ÁN 1: MỞ MINH CHỨNG
+    // ==========================================
+    function openEvidenceLink(url) {
+      const evidenceUrl = getChecklistEvidenceUrl(url);
+      if (!evidenceUrl) {
+        showEvidenceText(url);
+        return;
+      }
+      window.open(evidenceUrl, '_blank', 'noopener');
+    }
+
+    function showEvidenceText(text) {
+      Swal.fire({
+        title: 'Minh chứng của Khoa',
+        text: text,
+        icon: 'info',
+        confirmButtonColor: '#16a34a',
+        customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold' }
+      });
+    }
+
+    document.addEventListener('click', function(event) {
+      const button = event.target && event.target.closest
+        ? event.target.closest('[data-checklist-evidence-action]')
+        : null;
+      if (!button) return;
+
+      const item = findChecklistDetailItem(button.getAttribute('data-evidence-item-id'));
+      if (!item) return;
+
+      const evidenceText = getChecklistEvidenceText(
+        item.minhchung_bv !== undefined ? item.minhchung_bv : item.Minhchung
+      );
+
+      if (button.getAttribute('data-checklist-evidence-action') === 'link') {
+        openEvidenceLink(evidenceText);
+      } else {
+        showEvidenceText(evidenceText);
+      }
+    });
+
+    function openChecklistEvidenceManager(itemId) {
+      activeEvidenceManagerItemId = itemId;
+      const item = findChecklistDetailItem(itemId);
+      if (!item) return;
+
+      const list = getChecklistEvidenceList(item);
+      const legacyText = getChecklistLegacyEvidenceText(item).trim();
+      const listHtml = [];
+
+      if (legacyText) {
+        const legacyUrl = getChecklistEvidenceUrl(legacyText);
+        listHtml.push(
+          '<div class="p-3 rounded-xl border border-amber-200 bg-amber-50 text-left">' +
+            '<div class="flex items-start justify-between gap-3">' +
+              '<div class="min-w-0">' +
+                '<div class="text-[11px] font-black text-amber-700 uppercase">Minh chứng cũ</div>' +
+                '<div class="mt-1 text-[12px] font-bold text-slate-700 whitespace-pre-wrap break-words">' + escapeChecklistHtml(legacyText) + '</div>' +
+              '</div>' +
+              (legacyUrl ? '<button type="button" onclick="openEvidenceLink(\'' + escapeChecklistHtml(legacyUrl) + '\')" class="px-2 py-1 rounded-lg bg-white text-blue-600 border border-blue-100 text-[11px] font-black">Mở</button>' : '') +
+            '</div>' +
+          '</div>'
+        );
+      }
+
+      list.forEach(ev => {
+        const safeId = escapeChecklistHtml(ev.id);
+        const safeUrl = getChecklistEvidenceUrl(ev.url);
+        listHtml.push(
+          '<div class="p-3 rounded-xl border border-slate-200 bg-white text-left">' +
+            '<div class="flex items-start justify-between gap-3">' +
+              '<div class="min-w-0">' +
+                '<div class="font-black text-slate-800 text-[13px] break-words">' + escapeChecklistHtml(ev.title || 'Minh chứng') + '</div>' +
+                '<div class="mt-1 text-[11px] font-bold text-slate-400">' +
+                  escapeChecklistHtml(ev.type || 'link') +
+                  (ev.uploadedBy ? ' · ' + escapeChecklistHtml(ev.uploadedBy) : '') +
+                  (ev.uploadedAt ? ' · ' + escapeChecklistHtml(formatChecklistEvidenceDate(ev.uploadedAt)) : '') +
+                '</div>' +
+                (ev.url ? '<div class="mt-1 text-[11px] text-blue-600 break-all">' + escapeChecklistHtml(ev.url) + '</div>' : '') +
+                (ev.note ? '<div class="mt-2 text-[12px] text-slate-600 whitespace-pre-wrap break-words">' + escapeChecklistHtml(ev.note) + '</div>' : '') +
+              '</div>' +
+              '<div class="flex flex-col gap-1 shrink-0">' +
+                (safeUrl ? '<button type="button" onclick="openEvidenceLink(\'' + escapeChecklistHtml(safeUrl) + '\')" style="min-width:52px;padding:6px 10px;border-radius:10px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;font-size:11px;font-weight:900;white-space:nowrap;">Mở</button>' : '') +
+                '<button type="button" onclick="deleteChecklistEvidence(\'' + escapeChecklistHtml(itemId) + '\', \'' + safeId + '\')" style="min-width:52px;padding:6px 10px;border-radius:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-size:11px;font-weight:900;white-space:nowrap;">Xoá</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      });
+
+      Swal.fire({
+        title: 'Quản lý minh chứng',
+        html:
+          '<div class="text-left">' +
+            '<div class="text-[12px] font-bold text-slate-500 mb-3">Tiểu mục: ' + escapeChecklistHtml(item.noidungtc || item.id) + '</div>' +
+            '<div style="margin: 12px 0 14px 0;">' +
+              '<button type="button" onclick="triggerFileInput(\'' + escapeChecklistHtml(itemId) + '\')" style="width:100%;min-height:44px;border:0;border-radius:14px;background:#16a34a;color:#fff;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 18px rgba(22,163,74,0.24);cursor:pointer;">' +
+                '<span class="material-symbols-outlined" style="font-size:18px;color:#fff;">upload_file</span>' +
+                '<span>Gửi file lên</span>' +
+              '</button>' +
+            '</div>' +
+            '<div class="space-y-2 max-h-[52vh] overflow-y-auto pr-1">' +
+              (listHtml.length ? listHtml.join('') : '<div class="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-slate-400 text-[12px] font-bold">Chưa có minh chứng.</div>') +
+            '</div>' +
+          '</div>',
+        showConfirmButton: false,
+        showCloseButton: true,
+        width: 720,
+        customClass: { popup: 'rounded-3xl' }
+      });
+    }
+
+    function deleteChecklistEvidence(itemId, evidenceId) {
+      const item = findChecklistDetailItem(itemId);
+      if (!item) return;
+      const key = getChecklistEvidenceArrayKey();
+      item[key] = getChecklistEvidenceList(item).filter(ev => String(ev.id) !== String(evidenceId));
+      renderModalTable();
+      openChecklistEvidenceManager(itemId);
+    }
+
+    // ==========================================
+    // 3. VẼ BẢNG LƯỚI CHI TIẾT TRONG POPUP
+    // ==========================================
+    function getModalLevelKey(level) {
+      return 'level_' + normalizeChecklistText(level || 'Khac').replace(/[^a-z0-9]+/g, '_');
+    }
+
+    function toggleModalLevel(levelKey) {
+      modalOpenLevels[levelKey] = !modalOpenLevels[levelKey];
+      renderModalTable();
+    }
+
+    function isMobileModalViewport() {
+      return window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+    }
+
+    function syncModalNote(itemId, value) {
+      const targetItem = currentDetailItems.find(item => item.id === itemId);
+      if (!targetItem) return;
+      if (isChecklistDoanKT()) {
+        targetItem.minhchung_doan = value;
+      } else {
+        targetItem.minhchung_bv = value;
+      }
+    }
+
+    function renderModalTable() {
+      const tbody = document.getElementById('modal-criteria-table-body');
+      const isDoanKT = isChecklistDoanKT();
+      const colspanVal = isDoanKT ? 6 : 5;
+
+      if (!Array.isArray(currentDetailItems) || currentDetailItems.length === 0) {
+        tbody.innerHTML =
+          '<tr>' +
+            '<td colspan="' + colspanVal + '" class="p-8 text-center text-slate-400 font-bold">' +
+              'Không có tiểu mục phù hợp cho tiêu chí này trong phòng đang chọn.' +
+            '</td>' +
+          '</tr>';
+        return;
+      }
+
+      const grouped = currentDetailItems.reduce((acc, item) => {
+        const lv = item.mucdo || 'Khác';
+        if (!acc[lv]) acc[lv] = [];
+        acc[lv].push(item);
+        return acc;
+      }, {});
+
+      let htmlRows = '';
+
+      const levels = Object.keys(grouped).sort();
+      if (levels.length > 0 && Object.keys(modalOpenLevels).length === 0) {
+        const defaultOpenAll = !isMobileModalViewport();
+        levels.forEach((level, index) => {
+          modalOpenLevels[getModalLevelKey(level)] = defaultOpenAll || index === 0;
+        });
+      }
+
+      levels.forEach(level => {
+        const levelKey = getModalLevelKey(level);
+        const isLevelOpen = modalOpenLevels[levelKey] === true;
+        htmlRows += '<tr class="modal-level-row bg-slate-100/90 border-y border-gray-200" data-level-key="' + levelKey + '">' +
+          '<td colspan="' + colspanVal + '" class="p-2.5 font-black text-slate-700 text-[12px] tracking-wide">' +
+            '<button type="button" onclick="toggleModalLevel(\'' + levelKey + '\')" class="modal-level-toggle">' +
+              '<span class="material-symbols-outlined modal-level-chevron">' + (isLevelOpen ? 'expand_less' : 'expand_more') + '</span>' +
+              '<span>MỨC ĐỘ ' + level + '</span>' +
+              '<strong>' + grouped[level].length + ' tiểu mục</strong>' +
+            '</button>' +
+            'MỨC ĐỘ ' + level + ' (' + grouped[level].length + ' tiểu mục)' +
+          '</td>' +
+        '</tr>';
+
+        grouped[level].forEach(item => {
+          let scoreBV = "";
+          if (item.diemtc_bv !== undefined && item.diemtc_bv !== "") scoreBV = String(item.diemtc_bv);
+          else if (item.diemtc !== undefined && item.diemtc !== "") scoreBV = String(item.diemtc);
+
+          let scoreDoan = item.diemtc_doan !== undefined && item.diemtc_doan !== "" ? String(item.diemtc_doan) : (item.diem_doan !== undefined && item.diem_doan !== "" ? String(item.diem_doan) : (item.diem !== undefined ? String(item.diem) : ""));
+          let myScore = isDoanKT ? scoreDoan : scoreBV;
+          
+          const minhChungBv = getChecklistEvidenceText(
+            item.minhchung_bv !== undefined ? item.minhchung_bv : item.Minhchung
+          );
+          let note = getChecklistEvidenceText(isDoanKT ? item.minhchung_doan : minhChungBv);
+
+          const hasLink = note.toLowerCase().includes("http") || note.toLowerCase().includes("drive.google.com");
+          const attachLinkedClass = 'text-green-600 bg-green-50 border-green-200';
+          const attachEmptyClass = 'text-slate-400 hover:bg-slate-100 border-transparent';
+          const evidenceCount = getChecklistEvidenceCount(item);
+          const attachColor = evidenceCount > 0 || hasLink ? attachLinkedClass : attachEmptyClass;
+
+          // TÍCH HỢP "MẮT THẦN" XEM MINH CHỨNG CỦA KHOA
+          let tuchamIconHTML = '<span class="text-gray-300 font-bold text-[18px]">-</span>';
+          let viewEvidenceButtonHTML = "";
+
+          if (scoreBV === '1' || scoreBV === '0') {
+            if (scoreBV === '1') {
+              tuchamIconHTML = '<div class="w-7 h-7 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto shadow-sm"><span class="material-symbols-outlined text-[18px] font-black">check</span></div>';
+            } else {
+              tuchamIconHTML = '<div class="w-7 h-7 rounded-full bg-red-100 text-red-500 flex items-center justify-center mx-auto shadow-sm"><span class="material-symbols-outlined text-[18px] font-black">close</span></div>';
+            }
+
+            if (minhChungBv.trim() !== "") {
+              const evidenceItemId = escapeChecklistHtml(item.id);
+              const evidenceUrl = getChecklistEvidenceUrl(minhChungBv);
+              
+              if (evidenceUrl) {
+                viewEvidenceButtonHTML = '<button type="button" data-checklist-evidence-action="link" data-evidence-item-id="' + evidenceItemId + '" class="mt-1.5 inline-flex items-center gap-0.5 px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 font-black text-[10px] border border-blue-200 transition-all cursor-pointer shadow-sm"><span class="material-symbols-outlined text-[13px]">visibility</span> Xem MC</button>';
+              } else {
+                viewEvidenceButtonHTML = '<button type="button" data-checklist-evidence-action="text" data-evidence-item-id="' + evidenceItemId + '" class="mt-1.5 inline-flex items-center gap-0.5 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-[10px] border border-slate-200 transition-all cursor-pointer shadow-sm"><span class="material-symbols-outlined text-[13px]">chat_bubble</span> Đọc MC</button>';
+              }
+            }
+          }
+
+          let tuchamTD = '';
+          if (isDoanKT) {
+            tuchamTD = '<td data-label="Tự chấm" class="p-3.5 text-center border-r border-gray-100 bg-green-50/20 align-top">' +
+              '<div class="flex flex-col items-center justify-center">' +
+                tuchamIconHTML +
+                viewEvidenceButtonHTML +
+              '</div>' +
+            '</td>';
+          }
+
+          const noidungktHTML = item.noidungkt ? '<div class="text-[11px] text-gray-400 mt-2 font-bold italic leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">Nội dung KT: ' + item.noidungkt + '</div>' : '';
+
+          const isNotAchieved = myScore === '0';
+          const isAchieved = myScore === '1';
+
+          const activeNotAchievedClass = 'bg-red-500 text-white shadow-md scale-105 animate-[viewFadeIn_0.15s_ease-out]';
+          const activeAchievedClass = 'bg-green-500 text-white shadow-md scale-105 animate-[viewFadeIn_0.15s_ease-out]';
+                        const inactiveNotAchievedClass = 'bg-red-50 text-red-500 hover:bg-red-100';
+                        const inactiveAchievedClass = 'bg-green-50 text-green-600 hover:bg-green-100';
+          const activeScoreClassNotAchieved = isNotAchieved ? activeNotAchievedClass : inactiveNotAchievedClass;
+          const activeScoreClassAchieved = isAchieved ? activeAchievedClass : inactiveAchievedClass;
+
+          htmlRows += `
+            <tr class="modal-item-row border-b border-gray-200 hover:bg-slate-50/40 transition-colors ${isLevelOpen ? '' : 'hidden'}" id="row-${item.id}" data-level-key="${levelKey}">
+              
+              <!-- 1. Nội dung khảo sát -->
+              <td data-label="Nội dung khảo sát" class="p-3.5 border-r border-gray-100 align-top">
+                <div class="font-bold text-slate-800 leading-relaxed text-[13px]">${item.noidungtc}</div>
+                ${noidungktHTML}
+              </td>
+              
+              <!-- 2. Hướng Dẫn Chuẩn (Nút Accordion) -->
+              <td data-label="Hướng dẫn chuẩn" class="p-3.5 border-r border-gray-100 align-top text-center">
+                <div class="guideline-wrapper">
+                  <button id="btn-guideline-${item.id}" onclick="toggleGuideline('${item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#f0fdf4] hover:bg-[#dcfce7] text-[#16a34a] font-black text-[11px] border border-green-200 shadow-sm transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[15px]">help_center</span> Hướng dẫn
+                  </button>
+                  <div id="guideline-content-${item.id}" class="hidden mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11.5px] leading-relaxed text-left text-gray-600 transition-all">
+                    <div class="mb-2"><strong class="text-slate-800">Phương pháp:</strong> ${item.phuongphap || 'N/A'}</div>
+                    <div class="pt-2 border-t border-gray-200/60"><strong class="text-slate-800">Bằng chứng:</strong> ${item.bangchung || 'N/A'}</div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- 3. Tự Chấm -->
+              ${tuchamTD}
+
+              <!-- 4. Chấm điểm -->
+              <td data-label="Chấm điểm" class="p-3.5 border-r border-gray-100 text-center align-top">
+                <div class="flex gap-2.5 justify-center items-center">
+                  <button onclick="toggleRowScore('${item.id}', '0')" class="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border border-transparent ${activeScoreClassNotAchieved}" title="Không đạt">
+                    <span class="material-symbols-outlined text-[16px] font-black">close</span>
+                  </button>
+                  <button onclick="toggleRowScore('${item.id}', '1')" class="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border border-transparent ${activeScoreClassAchieved}" title="Đạt tiêu chí">
+                    <span class="material-symbols-outlined text-[16px] font-black">check</span>
+                  </button>
+                </div>
+              </td>
+
+              <!-- 5. Ghi chú thực tế -->
+              <td data-label="Ghi chú thực tế" class="p-3.5 border-r border-gray-100 align-top">
+                <textarea oninput="syncModalNote('${item.id}', this.value)" class="row-note-input w-full bg-slate-50 border border-gray-200 hover:border-gray-300 focus:bg-white focus:border-green-500 rounded-xl px-3 py-2 text-[12px] outline-none transition-all font-semibold text-gray-800 min-h-[42px] max-h-[120px] resize-y leading-relaxed" 
+                  placeholder="Ghi chú minh chứng..." rows="1">${note}</textarea>
+              </td>
+
+              <!-- 6. Đính kèm / Tải lên tệp minh chứng (Add File Button) -->
+              <td data-label="Minh chứng" class="p-3.5 text-center align-top">
+                <button onclick="openChecklistEvidenceManager('${item.id}')" id="btn-attach-${item.id}" class="min-w-14 px-2 py-1.5 rounded-xl border inline-flex flex-col items-center justify-center flex-shrink-0 transition-all mx-auto cursor-pointer ${attachColor}" title="Quản lý minh chứng">
+                  <span class="material-symbols-outlined text-[18px]">attachment</span>
+                  <span class="text-[10px] font-black">${evidenceCount} MC</span>
+                </button>
+              </td>
+
+            </tr>
+          `;
+        });
+      });
+
+      tbody.innerHTML = htmlRows;
+    }
+
+    // ==========================================
+    // 4. LOGIC TẢI LÊN TỆP MINH CHỨNG (ADD FILE HANDLER)
+    // ==========================================
+    function triggerFileInput(itemId) {
+      activeUploadItemId = itemId;
+      document.getElementById('file-uploader-input').click();
+    }
+
+    function showChecklistUploadProgress(title, text) {
+      Swal.fire({
+        title: title || 'Đang tải file',
+        text: text || 'Vui lòng giữ nguyên màn hình trong giây lát.',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        customClass: { popup: 'rounded-3xl' },
+        didOpen: () => Swal.showLoading()
+      });
+    }
+
+    function updateChecklistUploadProgress(title, text) {
+      if (Swal.isVisible && Swal.isVisible()) {
+        Swal.update({ title: title || 'Đang tải file', text: text || '' });
+      }
+    }
+
+    function handleFileSelected(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      // Giới hạn tệp tin 15MB tránh lỗi nén quá khổ
+      if (file.size > 15 * 1024 * 1024) {
+        Swal.fire({
+          title: 'Tệp quá lớn',
+          text: 'Dung lượng tệp tối đa cho phép là 15MB.',
+          icon: 'warning',
+          confirmButtonColor: '#16a34a',
+          customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-xl font-bold' }
+        });
+        input.value = "";
+        return;
+      }
+
+      const itemId = activeUploadItemId;
+      const btn = document.getElementById("btn-attach-" + itemId);
+      const originalHTML = btn ? btn.innerHTML : '';
+
+      // Đưa nút Upload về trạng thái Loading xoay độc lập
+      if (btn) {
+        btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin text-amber-500">sync</span>';
+        btn.disabled = true;
+      }
+
+      // Khóa tạm nút Lưu để tránh người dùng submit dở dang
+      const saveBtn = document.getElementById('btn-save-modal');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.classList.add('opacity-50');
+      }
+
+      const restoreUploadUi = () => {
+        if (btn && originalHTML) {
+          btn.innerHTML = originalHTML;
+          btn.disabled = false;
+        }
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.classList.remove('opacity-50');
+        }
+        input.value = "";
+      };
+
+      const reader = new FileReader();
+      showChecklistUploadProgress('Đang chuẩn bị tải file', 'Đang đọc tệp từ thiết bị...');
+      reader.onload = function(e) {
+        const base64Data = e.target.result;
+        const fileName = file.name;
+        const mimeType = file.type;
+        updateChecklistUploadProgress('Đang tải file lên Drive', 'File đang được gửi lên kho minh chứng. Vui lòng không đóng màn hình.');
+
+        // Trích xuất mã tiêu chí làm tên thư mục lưu Drive
+        const item = currentDetailItems.find(i => i.id === itemId);
+        const maTC = item ? (item.magop || "Chung") : "Chung";
+        const khoaName = currentConfig.khoa || "Khoa_Chung";
+
+        if (typeof google !== 'undefined') {
+          google.script.run.withSuccessHandler(res => {
+            // Giải phóng trạng thái khóa
+            restoreUploadUi();
+
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (res.success) {
+              if (item) {
+                getChecklistEvidenceList(item).push(createChecklistEvidenceRecord({
+                  title: fileName,
+                  url: res.url || '',
+                  type: 'file',
+                  note: ''
+                }));
+              }
+              renderModalTable();
+              if (activeEvidenceManagerItemId === itemId) {
+                openChecklistEvidenceManager(itemId);
+              }
+              const row = document.getElementById("row-" + itemId);
+              if (false && row) {
+                const textarea = row.querySelector('.row-note-input');
+                if (textarea) {
+                  const oldVal = textarea.value.trim();
+                  // Tự động điền link Drive công khai
+                  if (oldVal !== "") {
+                    textarea.value = oldVal + "\nMC: " + res.url;
+                  } else {
+                    textarea.value = res.url;
+                  }
+
+                  // Đồng bộ hóa vào mảng tạm bộ nhớ
+                  if (item) {
+                    const isDoanKT = isChecklistDoanKT();
+                    if (isDoanKT) item.minhchung_doan = textarea.value;
+                    else item.minhchung_bv = textarea.value;
+                  }
+                }
+              }
+
+              // Đổi nút kẹp giấy sang màu xanh lá cây tượng trưng cho Cloud Done
+              btn.className = "w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0 transition-all text-green-600 bg-green-50 border-green-200 mx-auto cursor-pointer";
+              btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">cloud_done</span>';
+
+              Swal.fire({
+                toast: true, position: 'top-end', icon: 'success',
+                title: 'Tải lên tệp thành công & Đã mở khóa quyền xem!',
+                showConfirmButton: false, timer: 3000
+              });
+              if (activeEvidenceManagerItemId === itemId) {
+                window.setTimeout(() => openChecklistEvidenceManager(itemId), 80);
+              }
+            } else {
+              Swal.fire('Lỗi tải tệp', res.message, 'error');
+            }
+          }).withFailureHandler(err => {
+            restoreUploadUi();
+            Swal.fire('Lỗi tải tệp', err && err.message ? err.message : 'Không thể tải file lên Drive. Vui lòng thử lại.', 'error');
+          }).uploadFileToDrive(base64Data, fileName, mimeType, khoaName, maTC, getSessionToken());
+        } else {
+          restoreUploadUi();
+          Swal.fire('Không thể tải file', 'Chưa kết nối được Google Apps Script.', 'error');
+        }
+      };
+      reader.onerror = function() {
+        restoreUploadUi();
+        Swal.fire('Không đọc được file', 'Vui lòng chọn lại tệp hoặc thử với tệp khác.', 'error');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ==========================================
+    // 5. LOGIC TÍCH NHANH TOÀN BỘ (BULK ACTIONS)
+    // ==========================================
+    function bulkMarkAllRows(scoreValue) {
+      if (currentDetailItems.length === 0) return;
+
+      const isDoanKT = isChecklistDoanKT();
+      
+      currentDetailItems.forEach(item => {
+        if (isDoanKT) {
+          item.diem = scoreValue;
+          item.diem_doan = scoreValue;
+          item.diemtc_doan = scoreValue;
+        } else {
+          item.diemtc = scoreValue;
+          item.diemtc_bv = scoreValue;
+        }
+      });
+
+      renderModalTable();
+      updateLiveScore();
+
+      const label = scoreValue === '1' ? 'ĐẠT (1đ)' : 'KHÔNG ĐẠT (0đ)';
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'success',
+        title: "Đã tích nhanh tất cả thành: " + label,
+        showConfirmButton: false, timer: 1500
+      });
+    }
+
+    // Toggle đóng/mở hướng dẫn chi tiết
+    function toggleGuideline(id) {
+      const content = document.getElementById(`guideline-content-${id}`);
+      const btn = document.getElementById(`btn-guideline-${id}`);
+      
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        btn.innerHTML = `<span class="material-symbols-outlined text-[15px]">visibility_off</span> Thu gọn`;
+        btn.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[11px] border border-gray-300 shadow-sm transition-all cursor-pointer";
+      } else {
+        content.classList.add('hidden');
+        btn.innerHTML = `<span class="material-symbols-outlined text-[15px]">help_center</span> Hướng dẫn`;
+        btn.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#f0fdf4] hover:bg-[#dcfce7] text-[#16a34a] font-black text-[11px] border border-green-200 shadow-sm transition-all cursor-pointer";
+      }
+    }
+
+    // Thay đổi điểm độc lập của một dòng
+    function toggleRowScore(itemId, scoreValue) {
+      const isDoanKT = isChecklistDoanKT();
+      const targetItem = currentDetailItems.find(i => i.id === itemId);
+      if (targetItem) {
+        if (isDoanKT) {
+          targetItem.diem = scoreValue;
+          targetItem.diem_doan = scoreValue;
+          targetItem.diemtc_doan = scoreValue;
+        } else {
+          targetItem.diemtc = scoreValue;
+          targetItem.diemtc_bv = scoreValue;
+        }
+      }
+
+      renderModalTable();
+      updateLiveScore();
+    }
+
+    // Thuật toán thác nước dự kiến điểm live thời gian thực
+    function updateLiveScore() {
+      if (currentDetailItems.length === 0) return;
+
+      const isDoanKT = isChecklistDoanKT();
+      const levels = { 2: [], 3: [], 4: [], 5: [] };
+      let hasScored = false;
+
+      currentDetailItems.forEach(item => {
+        let val = "";
+        if (isDoanKT) {
+          val = item.diemtc_doan !== undefined && item.diemtc_doan !== "" ? String(item.diemtc_doan) : (item.diem_doan !== undefined && item.diem_doan !== "" ? String(item.diem_doan) : (item.diem !== undefined ? String(item.diem) : ""));
+        } else {
+          val = item.diemtc_bv !== undefined && item.diemtc_bv !== "" ? String(item.diemtc_bv) : String(item.diemtc || "");
+        }
+
+        if (val !== "") hasScored = true;
+        if (levels[item.mucdo]) levels[item.mucdo].push(val);
+      });
+
+      if (!hasScored) {
+        document.getElementById('live-score-badge').innerText = "0/5";
+        return;
+      }
+
+      const checkLevelPass = (levelArray) => {
+        if (!levelArray || levelArray.length === 0) return false;
+        return levelArray.every(val => val === "1");
+      };
+
+      let finalScore = 1; 
+
+      if (checkLevelPass(levels[2])) {
+        finalScore = 2;
+        if (checkLevelPass(levels[3])) {
+          finalScore = 3;
+          if (checkLevelPass(levels[4])) {
+            finalScore = 4;
+            if (checkLevelPass(levels[5])) {
+              finalScore = 5;
+            }
+          }
+        }
+      }
+
+      document.getElementById('live-score-badge').innerText = finalScore + "/5";
+    }
+
+    // Đồng bộ 1 click cho Đoàn KT
+    function copyScoresInModal() {
+      currentDetailItems.forEach(item => {
+        let scoreBV = "";
+        if (item.diemtc_bv !== undefined && item.diemtc_bv !== "") scoreBV = String(item.diemtc_bv);
+        else if (item.diemtc !== undefined && item.diemtc !== "") scoreBV = String(item.diemtc);
+
+        if (scoreBV !== "") {
+          item.diem = scoreBV;
+          item.diem_doan = scoreBV;
+          item.diemtc_doan = scoreBV; 
+          const noteBV = getChecklistEvidenceText(item.minhchung_bv !== undefined ? item.minhchung_bv : item.Minhchung);
+          item.minhchung_doan = noteBV;
+          item.evidences_doan = Array.isArray(item.evidences_bv)
+            ? JSON.parse(JSON.stringify(item.evidences_bv))
+            : [];
+        }
+      });
+
+      renderModalTable();
+      updateLiveScore();
+      
+      Swal.fire({ title: 'Đồng bộ xong!', text: 'Đã copy toàn bộ điểm và minh chứng của Khoa sang cột của Đoàn kiểm tra.', icon: 'success', confirmButtonColor: '#16a34a'});
+    }
+
+    // ========================================================
+    // 6. PHƯƠNG ÁN 2: LƯU KẾT QUẢ ĐỌC TRỰC TIẾP TỪ BỘ NHỚ TRONG & TỰ ĐỘNG THỬ LẠI (CONCURRENCY PROTECTION)
+    // ========================================================
+    function submitDanhGiaModal() {
+      if (!activeIdKetQua || currentDetailItems.length === 0) return;
+
+      const btn = document.getElementById('btn-save-modal');
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> Đang gửi lưu...';
+      btn.disabled = true;
+
+      const isDoanKT = isChecklistDoanKT();
+      const updatedItemsPayload = [];
+
+      // Quét qua mảng dữ liệu gốc trong bộ nhớ, chỉ "mò" DOM để lấy phần textareas ghi chú
+      currentDetailItems.forEach(item => {
+        const row = document.getElementById(`row-${item.id}`);
+        let currentNoteText = "";
+        
+        if (row) {
+          const textarea = row.querySelector('.row-note-input');
+          if (textarea) {
+            currentNoteText = textarea.value;
+          }
+        }
+
+        const payload = { id: item.id };
+        
+        if (isDoanKT) {
+          payload.diemtc_doan = item.diemtc_doan !== undefined && item.diemtc_doan !== "" ? String(item.diemtc_doan) : (item.diem_doan !== undefined && item.diem_doan !== "" ? String(item.diem_doan) : (item.diem !== undefined ? String(item.diem) : ""));
+          payload.minhchung_doan = currentNoteText;
+          payload.evidences_doan = Array.isArray(item.evidences_doan) ? item.evidences_doan : [];
+        } else {
+          payload.diemtc_bv = item.diemtc_bv !== undefined && item.diemtc_bv !== "" ? String(item.diemtc_bv) : (item.diemtc !== undefined ? String(item.diemtc) : "");
+          payload.minhchung_bv = currentNoteText;
+          payload.evidences_bv = Array.isArray(item.evidences_bv) ? item.evidences_bv : [];
+        }
+        updatedItemsPayload.push(payload);
+      });
+
+      // Kiểm tra trạng thái chấm dở dang hay hoàn tất
+      let chuaXongPhanMinh = false;
+      if (isDoanKT) {
+        chuaXongPhanMinh = updatedItemsPayload.some(i => i.diemtc_doan === "");
+      } else {
+        chuaXongPhanMinh = updatedItemsPayload.some(i => i.diemtc_bv === "");
+      }
+      const trangThai = chuaXongPhanMinh ? "Đang chấm dang dở" : "Đã hoàn thành phần việc";
+
+      function isRetryableSaveError(message) {
+        const text = String(message || '').toLowerCase();
+        return text.includes("quá tải") ||
+          text.includes("bận") ||
+          text.includes("lock") ||
+          text.includes("busy") ||
+          text.includes("timeout") ||
+          text.includes("timed out") ||
+          text.includes("too many") ||
+          text.includes("service invoked") ||
+          text.includes("không phản hồi");
+      }
+
+      function getSaveRetryDelay(baseDelay) {
+        return baseDelay + Math.floor(Math.random() * 900);
+      }
+
+      function setSaveButtonBusy(text) {
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> ' + text;
+      }
+
+      // HÀM GỬI LƯU NGẦM TỰ ĐỘNG THỬ LẠI KHI HỆ THỐNG BẬN (EXPONENTIAL BACKOFF + JITTER)
+      function attemptSave(retriesLeft, currentDelay, attemptNumber) {
+        if (typeof google !== 'undefined') {
+          const maxAttempts = attemptNumber + retriesLeft;
+          setSaveButtonBusy('Đang lưu lần ' + attemptNumber + '/' + maxAttempts + '...');
+
+          const handleSaveFailure = (message) => {
+            const isLocked = isRetryableSaveError(message);
+            
+            if (isLocked && retriesLeft > 0) {
+              const retryDelay = getSaveRetryDelay(currentDelay);
+              const seconds = Math.max(1, Math.ceil(retryDelay / 1000));
+              setSaveButtonBusy('Đang chờ lượt lưu... thử lại sau ' + seconds + 's');
+              setTimeout(() => {
+                attemptSave(retriesLeft - 1, Math.min(currentDelay * 2, 8000), attemptNumber + 1);
+              }, retryDelay);
+            } else {
+              btn.innerHTML = originalHTML;
+              btn.disabled = false;
+              Swal.fire({ title: 'Lỗi', text: message || 'Không lưu được dữ liệu. Vui lòng thử lại.', icon: 'error', confirmButtonColor: '#ef4444'});
+            }
+          };
+
+          google.script.run
+          .withSuccessHandler(res => {
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) {
+              btn.innerHTML = originalHTML;
+              btn.disabled = false;
+              return;
+            }
+            if (res.success) {
+              btn.innerHTML = originalHTML;
+              btn.disabled = false;
+              Swal.fire({ title: 'Thành công', text: res.message, icon: 'success', confirmButtonColor: '#16a34a', timer: 2000});
+              applySavedChecklistChangesToClient();
+              closeMarkingModal();
+            } else {
+              handleSaveFailure(res.message);
+            }
+          })
+          .withFailureHandler(err => {
+            handleSaveFailure(err && err.message ? err.message : String(err || 'Không lưu được dữ liệu.'));
+          })
+          .saveKetQuaSmartMerge(activeIdKetQua, updatedItemsPayload, trangThai, activeMaGop, getSessionToken());
+        } else {
+          btn.innerHTML = originalHTML;
+          btn.disabled = false;
+        }
+      }
+
+      attemptSave(4, 1500, 1); // Tự động thử lại có jitter để tránh nhiều người retry cùng một nhịp.
+    }
+  </script>

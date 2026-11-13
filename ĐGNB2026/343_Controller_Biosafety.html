@@ -1,0 +1,340 @@
+<!-- 343_Controller_Biosafety.html: client-side behavior for 342_BiosafetyView.html. -->
+<script>
+    let biosafetyState = {
+      loaded: false,
+      loading: false,
+      departments: [],
+      rows: [],
+      summary: null,
+      mode: 'readonly',
+      canWrite: false,
+      deptName: '',
+      period: '',
+      activeChapter: '',
+      dirty: false
+    };
+
+    function initBiosafetyUI() {
+      if (!biosafetyState.loaded && !biosafetyState.loading) loadBiosafetyDepartments();
+      else renderBiosafety();
+    }
+
+    function bioEscape(value) {
+      return window.App.utils.escapeHtml(value || '');
+    }
+
+    function getBiosafetyRole() {
+      const roleSelect = document.getElementById('bio-role');
+      return roleSelect ? roleSelect.value : 'khoa';
+    }
+
+    function setBiosafetyLoading(isLoading) {
+      biosafetyState.loading = isLoading;
+      document.getElementById('bio-loading')?.classList.toggle('hidden', !isLoading);
+      document.getElementById('bio-loading')?.classList.toggle('flex', isLoading);
+      document.getElementById('bio-panel')?.classList.toggle('hidden', isLoading || !biosafetyState.loaded);
+    }
+
+    function loadBiosafetyDepartments() {
+      setBiosafetyLoading(true);
+      if (typeof google === 'undefined') return;
+      google.script.run
+        .withSuccessHandler(res => {
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            showBiosafetyError(res && res.message ? res.message : 'Khong tai duoc bang kiem ATSH.');
+            return;
+          }
+          biosafetyState.departments = res.data.departments || [];
+          biosafetyState.mode = res.data.mode || 'readonly';
+          biosafetyState.canWrite = !!res.data.canWrite;
+          biosafetyState.period = res.data.period || '';
+          const deptSelect = document.getElementById('bio-dept');
+          const periodInput = document.getElementById('bio-period');
+          const roleSelect = document.getElementById('bio-role');
+          if (deptSelect) deptSelect.innerHTML = biosafetyState.departments.map(dept => '<option value="' + bioEscape(dept.name) + '">' + bioEscape(dept.name) + '</option>').join('');
+          if (periodInput) periodInput.value = biosafetyState.period;
+          if (roleSelect) {
+            roleSelect.value = biosafetyState.mode === 'doan_kiem_tra' ? 'doan_kiem_tra' : 'khoa';
+            roleSelect.disabled = biosafetyState.mode !== 'admin';
+          }
+          document.getElementById('btn-bio-save')?.classList.toggle('hidden', !biosafetyState.canWrite);
+          updateBiosafetySaveState();
+          if (!biosafetyState.departments.length) {
+            setBiosafetyLoading(false);
+            showBiosafetyEmpty();
+            return;
+          }
+          loadBiosafetyChecklist(true);
+        })
+        .withFailureHandler(err => showBiosafetyError(err && err.message ? err.message : String(err)))
+        .getBiosafetyDepartments(getSessionToken());
+    }
+
+    function loadBiosafetyChecklist(force) {
+      const deptName = document.getElementById('bio-dept')?.value || '';
+      const period = document.getElementById('bio-period')?.value || '';
+      if (!deptName) return;
+      if (biosafetyState.loaded && !force && biosafetyState.deptName === deptName && biosafetyState.period === period) {
+        renderBiosafety();
+        return;
+      }
+      setBiosafetyLoading(true);
+      google.script.run
+        .withSuccessHandler(res => {
+          setBiosafetyLoading(false);
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            showBiosafetyError(res && res.message ? res.message : 'Khong tai duoc bang kiem ATSH.');
+            return;
+          }
+          biosafetyState.loaded = true;
+          biosafetyState.rows = res.data.rows || [];
+          biosafetyState.summary = res.data.summary || null;
+          biosafetyState.mode = res.data.mode || biosafetyState.mode;
+          biosafetyState.canWrite = !!res.data.canWrite;
+          biosafetyState.deptName = res.data.deptName || deptName;
+          biosafetyState.period = res.data.period || period;
+          biosafetyState.activeChapter = '';
+          biosafetyState.dirty = false;
+          updateBiosafetySaveState();
+          renderBiosafety();
+        })
+        .withFailureHandler(err => showBiosafetyError(err && err.message ? err.message : String(err)))
+        .getBiosafetyChecklist(getSessionToken(), deptName, period);
+    }
+
+    function showBiosafetyEmpty() {
+      document.getElementById('bio-panel')?.classList.add('hidden');
+      document.getElementById('bio-empty')?.classList.remove('hidden');
+      document.getElementById('bio-empty')?.classList.add('flex');
+    }
+
+    function hideBiosafetyEmpty() {
+      document.getElementById('bio-empty')?.classList.add('hidden');
+      document.getElementById('bio-empty')?.classList.remove('flex');
+    }
+
+    function showBiosafetyError(message) {
+      setBiosafetyLoading(false);
+      showBiosafetyEmpty();
+      if (typeof Swal !== 'undefined') Swal.fire('Loi bang kiem ATSH', message, 'error');
+    }
+
+    function groupBiosafetyRows() {
+      const chapters = [];
+      biosafetyState.rows.forEach(row => {
+        const title = row.chapter || 'Bang kiem';
+        let chapter = chapters.find(item => item.title === title);
+        if (!chapter) {
+          chapter = { title: title, items: [] };
+          chapters.push(chapter);
+        }
+        chapter.items.push(row);
+      });
+      return chapters;
+    }
+
+    function getBiosafetyRowResult(row) {
+      return getBiosafetyRole() === 'doan_kiem_tra' ? row.doanResult : row.khoaResult;
+    }
+
+    function getBiosafetyRowNote(row) {
+      return getBiosafetyRole() === 'doan_kiem_tra' ? row.doanNote : row.khoaNote;
+    }
+
+    function getBiosafetyOtherResult(row) {
+      return getBiosafetyRole() === 'doan_kiem_tra' ? row.khoaResult : row.doanResult;
+    }
+
+    function getBiosafetyOtherNote(row) {
+      return getBiosafetyRole() === 'doan_kiem_tra' ? row.khoaNote : row.doanNote;
+    }
+
+    function syncBiosafetyInputsToState() {
+      const role = getBiosafetyRole();
+      document.querySelectorAll('.bio-result').forEach(select => {
+        const itemId = select.getAttribute('data-item-id');
+        const row = biosafetyState.rows.find(item => item.itemId === itemId);
+        if (!row) return;
+        if (role === 'doan_kiem_tra') row.doanResult = select.value;
+        else row.khoaResult = select.value;
+      });
+      document.querySelectorAll('.bio-note').forEach(input => {
+        const itemId = input.getAttribute('data-item-id');
+        const row = biosafetyState.rows.find(item => item.itemId === itemId);
+        if (!row) return;
+        if (role === 'doan_kiem_tra') row.doanNote = input.value;
+        else row.khoaNote = input.value;
+      });
+    }
+
+    function calculateBiosafetySummary() {
+      const summary = { total: biosafetyState.rows.length, khoaDone: 0, doanDone: 0, khoaFail: 0, doanFail: 0 };
+      biosafetyState.rows.forEach(row => {
+        if (row.khoaResult) summary.khoaDone++;
+        if (row.doanResult) summary.doanDone++;
+        if (row.khoaResult === 'Không đạt') summary.khoaFail++;
+        if (row.doanResult === 'Không đạt') summary.doanFail++;
+      });
+      summary.khoaPercent = summary.total ? Math.round((summary.khoaDone / summary.total) * 100) : 0;
+      summary.doanPercent = summary.total ? Math.round((summary.doanDone / summary.total) * 100) : 0;
+      return summary;
+    }
+
+    function renderBiosafetySummary() {
+      const summary = calculateBiosafetySummary();
+      document.getElementById('bio-total').textContent = String(summary.total);
+      document.getElementById('bio-khoa-done').textContent = summary.khoaPercent + '%';
+      document.getElementById('bio-doan-done').textContent = summary.doanPercent + '%';
+      document.getElementById('bio-fail').textContent = String(getBiosafetyRole() === 'doan_kiem_tra' ? summary.doanFail : summary.khoaFail);
+    }
+
+    function renderBiosafety() {
+      hideBiosafetyEmpty();
+      const panel = document.getElementById('bio-panel');
+      if (panel) panel.classList.toggle('hidden', !biosafetyState.loaded);
+      const chapters = groupBiosafetyRows();
+      if (!chapters.length) {
+        showBiosafetyEmpty();
+        return;
+      }
+      if (!biosafetyState.activeChapter) biosafetyState.activeChapter = chapters[0].title;
+      const chapterSelect = document.getElementById('bio-chapter');
+      if (chapterSelect) {
+        chapterSelect.innerHTML = chapters.map(chapter => '<option value="' + bioEscape(chapter.title) + '"' + (chapter.title === biosafetyState.activeChapter ? ' selected' : '') + '>' + bioEscape(chapter.title) + '</option>').join('');
+      }
+      const active = chapters.find(chapter => chapter.title === biosafetyState.activeChapter) || chapters[0];
+      document.getElementById('bio-active-chapter').textContent = active.title;
+      document.getElementById('bio-active-progress').textContent = getActiveBiosafetyDoneCount(active.items) + '/' + active.items.length;
+      document.getElementById('bio-btn-sync-role')?.classList.toggle('hidden', getBiosafetyRole() !== 'doan_kiem_tra');
+      document.getElementById('bio-list').innerHTML = renderBiosafetyItems(active.items);
+      renderBiosafetySummary();
+    }
+
+    function getActiveBiosafetyDoneCount(items) {
+      return (items || []).filter(row => !!getBiosafetyRowResult(row)).length;
+    }
+
+    function renderBiosafetyItems(items) {
+      if (!items || !items.length) return '<div class="text-center text-slate-400 font-bold py-8">Khong co tieu muc trong chuong nay.</div>';
+      const canEdit = biosafetyState.canWrite;
+      return items.map(row => {
+        const result = getBiosafetyRowResult(row);
+        const note = getBiosafetyRowNote(row);
+        const otherResult = getBiosafetyOtherResult(row);
+        const otherNote = getBiosafetyOtherNote(row);
+        return [
+          '<article class="bio-item">',
+            '<div>',
+              '<div class="bio-item-meta">' + bioEscape(row.section || row.chapter || '') + '</div>',
+              '<div class="bio-item-title">' + bioEscape(row.content || row.guidance || '') + '</div>',
+              row.guidance && row.content ? '<div class="bio-item-guide">' + bioEscape(row.guidance) + '</div>' : '',
+            '</div>',
+            '<div>',
+              '<select class="bio-result" data-item-id="' + bioEscape(row.itemId) + '" onchange="markBiosafetyDirty()" ' + (canEdit ? '' : 'disabled') + '>',
+                '<option value="">Chua cham</option>',
+                '<option value="Đạt" ' + (result === 'Đạt' ? 'selected' : '') + '>Dat</option>',
+                '<option value="Không đạt" ' + (result === 'Không đạt' ? 'selected' : '') + '>Khong dat</option>',
+                '<option value="Không áp dụng" ' + (result === 'Không áp dụng' ? 'selected' : '') + '>Khong ap dung</option>',
+              '</select>',
+              '<div class="bio-other mt-2">Ben con lai: <strong>' + bioEscape(otherResult || 'Chua cham') + '</strong>' + (otherNote ? '<br>' + bioEscape(otherNote) : '') + '</div>',
+            '</div>',
+            '<textarea class="bio-note" data-item-id="' + bioEscape(row.itemId) + '" oninput="markBiosafetyDirty()" ' + (canEdit ? '' : 'disabled') + ' placeholder="Ghi chu, link minh chung...">' + bioEscape(note) + '</textarea>',
+          '</article>'
+        ].join('');
+      }).join('');
+    }
+
+    function setBiosafetyChapter(title) {
+      syncBiosafetyInputsToState();
+      biosafetyState.activeChapter = title;
+      renderBiosafety();
+    }
+
+    function setBiosafetyRoleView() {
+      syncBiosafetyInputsToState();
+      renderBiosafety();
+      updateBiosafetySaveState();
+    }
+
+    function markBiosafetyDirty() {
+      syncBiosafetyInputsToState();
+      biosafetyState.dirty = true;
+      updateBiosafetySaveState();
+      renderBiosafetySummary();
+      const active = groupBiosafetyRows().find(chapter => chapter.title === biosafetyState.activeChapter);
+      if (active) document.getElementById('bio-active-progress').textContent = getActiveBiosafetyDoneCount(active.items) + '/' + active.items.length;
+    }
+
+    function updateBiosafetySaveState() {
+      const btn = document.getElementById('btn-bio-save');
+      const label = document.getElementById('bio-save-label');
+      if (!btn || !label) return;
+      btn.disabled = !biosafetyState.canWrite || !biosafetyState.dirty;
+      btn.classList.toggle('is-clean', !biosafetyState.dirty);
+      label.textContent = biosafetyState.dirty ? 'Luu thay doi' : 'Da dong bo';
+    }
+
+    function getActiveBiosafetyRows() {
+      const chapters = groupBiosafetyRows();
+      const active = chapters.find(chapter => chapter.title === biosafetyState.activeChapter) || chapters[0];
+      return active ? active.items : [];
+    }
+
+    function bulkBiosafetyMark(result) {
+      if (!biosafetyState.canWrite) return;
+      syncBiosafetyInputsToState();
+      const role = getBiosafetyRole();
+      getActiveBiosafetyRows().forEach(row => {
+        if (role === 'doan_kiem_tra') row.doanResult = result;
+        else row.khoaResult = result;
+      });
+      biosafetyState.dirty = true;
+      renderBiosafety();
+      updateBiosafetySaveState();
+    }
+
+    function syncBiosafetyFromKhoa() {
+      if (!biosafetyState.canWrite || getBiosafetyRole() !== 'doan_kiem_tra') return;
+      syncBiosafetyInputsToState();
+      getActiveBiosafetyRows().forEach(row => {
+        row.doanResult = row.khoaResult || row.doanResult || '';
+        row.doanNote = row.khoaNote || row.doanNote || '';
+      });
+      biosafetyState.dirty = true;
+      renderBiosafety();
+      updateBiosafetySaveState();
+    }
+
+    function saveBiosafety() {
+      if (!biosafetyState.canWrite || !biosafetyState.dirty) return;
+      syncBiosafetyInputsToState();
+      const role = getBiosafetyRole();
+      const formData = biosafetyState.rows.map(row => ({
+        itemId: row.itemId,
+        ketQua: role === 'doan_kiem_tra' ? row.doanResult : row.khoaResult,
+        ghiChu: role === 'doan_kiem_tra' ? row.doanNote : row.khoaNote
+      }));
+      const btn = document.getElementById('btn-bio-save');
+      if (btn) btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(res => {
+          if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+          if (!res || !res.success) {
+            showBiosafetyError(res && res.message ? res.message : 'Khong luu duoc bang kiem ATSH.');
+            updateBiosafetySaveState();
+            return;
+          }
+          biosafetyState.dirty = false;
+          updateBiosafetySaveState();
+          if (typeof Swal !== 'undefined') Swal.fire('Da luu', res.message || 'Da luu bang kiem ATSH.', 'success');
+          loadBiosafetyChecklist(true);
+        })
+        .withFailureHandler(err => {
+          updateBiosafetySaveState();
+          showBiosafetyError(err && err.message ? err.message : String(err));
+        })
+        .saveBiosafetyEvaluation(getSessionToken(), document.getElementById('bio-dept').value, document.getElementById('bio-period').value, role, formData);
+    }
+</script>

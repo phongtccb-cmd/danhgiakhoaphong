@@ -1,0 +1,435 @@
+<!-- 301_Controller_Dashboard.html: client-side behavior for 300_DashboardView.html. -->
+<script>
+    let dashboardState = {
+      loaded: false,
+      loading: false,
+      data: null,
+      cachedAtMs: 0,
+      ttlMs: 60000
+    };
+
+    function initDashboardUI() {
+      if (typeof canViewDashboard === 'function' && !canViewDashboard()) {
+        if (typeof switchView === 'function') switchView('view-checklist');
+        return;
+      }
+      if (!dashboardState.loaded && !dashboardState.loading) {
+        loadDashboardOverview(false);
+      } else {
+        renderDashboardOverview(dashboardState.data);
+      }
+    }
+
+    function loadDashboardOverview(forceReload) {
+      if (typeof canViewDashboard === 'function' && !canViewDashboard()) return;
+      if (dashboardState.loading) return;
+      const isFresh = dashboardState.loaded
+        && !forceReload
+        && dashboardState.cachedAtMs
+        && (Date.now() - dashboardState.cachedAtMs < dashboardState.ttlMs);
+      if (isFresh) {
+        renderDashboardOverview(dashboardState.data);
+        setDashboardRefreshState('cached');
+        return;
+      }
+
+      dashboardState.loading = true;
+      setDashboardLoading(true);
+      setDashboardRefreshState('loading');
+
+      const allowedKhoas = currentUser && Array.isArray(currentUser.quyenTruyCap) ? currentUser.quyenTruyCap : [];
+
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(res => {
+            dashboardState.loading = false;
+            setDashboardLoading(false);
+            if (typeof handleApiAuthError === 'function' && handleApiAuthError(res)) return;
+            if (!res || !res.success) {
+              showDashboardError(res && res.message ? res.message : 'Không tải được dashboard.');
+              return;
+            }
+            dashboardState.loaded = true;
+            dashboardState.data = res.data || null;
+            dashboardState.cachedAtMs = Date.now();
+            renderDashboardOverview(dashboardState.data);
+            setDashboardRefreshState('ok');
+          })
+          .withFailureHandler(err => {
+            dashboardState.loading = false;
+            setDashboardLoading(false);
+            setDashboardRefreshState('error');
+            showDashboardError(err && err.message ? err.message : String(err || 'Lỗi kết nối Apps Script.'));
+          })
+          .getDashboardOverview(allowedKhoas, getSessionToken());
+      }
+    }
+
+    function setDashboardLoading(isLoading) {
+      document.getElementById('dashboard-loading').classList.toggle('hidden', !isLoading);
+      document.getElementById('dashboard-loading').classList.toggle('flex', isLoading);
+      document.getElementById('dashboard-content').classList.add('hidden');
+      document.getElementById('dashboard-empty').classList.add('hidden');
+      document.getElementById('dashboard-empty').classList.remove('flex');
+      document.getElementById('btn-dashboard-refresh').disabled = isLoading;
+      document.getElementById('btn-dashboard-refresh').classList.toggle('opacity-60', isLoading);
+    }
+
+    function setDashboardRefreshState(state) {
+      const el = document.getElementById('dashboard-refresh-state');
+      if (!el) return;
+      el.classList.remove('hidden', 'is-ok', 'is-error');
+      if (state === 'loading') {
+        el.innerText = '\u0110ang t\u1ea3i...';
+      } else if (state === 'ok') {
+        el.innerText = '\u0110\u00e3 c\u1eadp nh\u1eadt';
+        el.classList.add('is-ok');
+        window.setTimeout(() => el.classList.add('hidden'), 2400);
+      } else if (state === 'cached') {
+        el.innerText = 'D\u1eef li\u1ec7u c\u00f2n m\u1edbi';
+        el.classList.add('is-ok');
+        window.setTimeout(() => el.classList.add('hidden'), 1800);
+      } else if (state === 'error') {
+        el.innerText = 'L\u1ed7i c\u1eadp nh\u1eadt';
+        el.classList.add('is-error');
+      } else {
+        el.classList.add('hidden');
+      }
+    }
+
+    function showDashboardError(message) {
+      document.getElementById('dashboard-content').classList.add('hidden');
+      document.getElementById('dashboard-empty').classList.remove('hidden');
+      document.getElementById('dashboard-empty').classList.add('flex');
+      if (typeof Swal !== 'undefined') {
+        Swal.fire('Lỗi tải dashboard', message, 'error');
+      } else {
+        alert(message);
+      }
+    }
+
+    function escapeDashboardHtml(value) {
+      return window.App.utils.escapeHtml(value || '');
+    }
+
+    function dashboardNumber(value) {
+      const n = Number(value || 0);
+      return Number.isInteger(n) ? String(n) : n.toFixed(1);
+    }
+
+    function dashboardPercent(value) {
+      return dashboardNumber(value) + '%';
+    }
+
+    function setDashboardBar(id, percent) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const width = Math.max(0, Math.min(100, Number(percent || 0)));
+      el.style.transform = 'scaleX(' + (width / 100) + ')';
+    }
+
+    function setDashboardDonut(percent, done, total) {
+      const donut = document.getElementById('dash-doan-donut');
+      const value = document.getElementById('dash-doan-donut-value');
+      const caption = document.getElementById('dash-doan-donut-caption');
+      const safePercent = Math.max(0, Math.min(100, Number(percent || 0)));
+      if (donut) donut.style.setProperty('--value', safePercent);
+      if (value) value.innerText = dashboardPercent(safePercent);
+      if (caption) caption.innerText = dashboardNumber(done || 0) + '/' + dashboardNumber(total || 0) + ' tiêu chí';
+    }
+
+    function formatDashboardGap(value) {
+      const n = Number(value || 0);
+      if (n > 0) return '+' + dashboardNumber(n);
+      return dashboardNumber(n);
+    }
+
+    function dashboardToggleClass(id, className, enabled) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle(className, !!enabled);
+    }
+
+    function getDashboardDataAge(data) {
+      const stats = data && data.stats ? data.stats : {};
+      const lastUpdatedMs = Number(stats.lastUpdatedMs || 0);
+      const generatedAtMs = Number(data && data.generatedAtMs || Date.now());
+      if (!lastUpdatedMs) return { days: null, stale: true };
+      const ageMs = Math.max(0, generatedAtMs - lastUpdatedMs);
+      const days = Math.floor(ageMs / 86400000);
+      return { days: days, stale: days >= 7 };
+    }
+
+    function updateDashboardHealth(data) {
+      const stats = data && data.stats ? data.stats : {};
+      const total = Number(stats.totalCriteria || 0);
+      const diffCount = Number(stats.diffCount || 0);
+      const remainingDoan = Math.max(0, total - Number(stats.doanCompleted || 0));
+      const age = getDashboardDataAge(data);
+
+      dashboardToggleClass('dash-stat-box-diff', 'dashboard-stat-alert', diffCount > 0);
+      dashboardToggleClass('dash-stat-box-doan', 'dashboard-stat-alert', remainingDoan > 0);
+      dashboardToggleClass('dash-stat-box-updated', 'dashboard-stat-danger', age.stale && total > 0);
+
+      const freshness = document.getElementById('dash-data-freshness');
+      const status = document.getElementById('dash-data-status');
+      if (freshness) {
+        freshness.classList.toggle('is-stale', age.stale && total > 0);
+        freshness.innerText = age.days === null ? 'Ch\u01b0a c\u00f3 c\u1eadp nh\u1eadt' : (age.days === 0 ? 'M\u1edbi c\u1eadp nh\u1eadt' : age.days + ' ng\u00e0y tr\u01b0\u1edbc');
+      }
+      if (status) {
+        status.classList.toggle('is-stale', age.stale && total > 0);
+        const generatedAt = data && data.generatedAt ? data.generatedAt : '--';
+        const lastUpdated = stats.lastUpdated || '--';
+        status.innerText = 'D\u1eef li\u1ec7u: ' + lastUpdated + ' | Dashboard: ' + generatedAt + (age.stale && total > 0 ? ' | C\u1ea7n t\u1ea3i l\u1ea1i/ki\u1ec3m tra d\u1eef li\u1ec7u' : '');
+      }
+    }
+
+    function renderDashboardActions(data) {
+      const el = document.getElementById('dash-action-list');
+      if (!el) return;
+      const attentionRows = Array.isArray(data && data.attentionRows) ? data.attentionRows : [];
+      const departments = Array.isArray(data && data.departments) ? data.departments : [];
+      const actions = attentionRows.slice(0, 5).map(row => ({
+        type: 'criteria',
+        title: (row.khoa || '--') + ' / ' + (row.maTC || '--'),
+        subtitle: row.noiDung || '',
+        khoa: row.khoa || '',
+        maTC: row.maTC || '',
+        badges: [
+          { text: row.reason || 'C\u1ea7n xem', className: Number(row.diff || 0) !== 0 ? 'is-diff' : 'is-hot' },
+          { text: row.phong || '--', className: '' }
+        ]
+      }));
+
+      if (actions.length < 3) {
+        departments
+          .filter(row => Number(row.remainingDoan || 0) > 0 || Number(row.diffCount || 0) > 0)
+          .slice(0, 5 - actions.length)
+          .forEach(row => {
+            actions.push({
+              type: 'department',
+              title: row.khoa || '--',
+              subtitle: 'Khoa c\u1ea7n theo d\u00f5i',
+              khoa: row.khoa || '',
+              maTC: '',
+              badges: [
+                { text: 'C\u00f2n \u0110o\u00e0n ' + Number(row.remainingDoan || 0), className: 'is-hot' },
+                { text: 'Ch\u00eanh ' + Number(row.diffCount || 0), className: Number(row.diffCount || 0) > 0 ? 'is-diff' : '' }
+              ]
+            });
+          });
+      }
+
+      if (!actions.length) {
+        el.innerHTML = '<div class="dashboard-empty-row">Kh\u00f4ng c\u00f3 vi\u1ec7c n\u00f3ng c\u1ea7n x\u1eed l\u00fd.</div>';
+        return;
+      }
+
+      el.innerHTML = actions.map(item => (
+        '<button type="button" class="dashboard-action-item" data-khoa="' + escapeDashboardHtml(item.khoa) + '" data-ma-tc="' + escapeDashboardHtml(item.maTC) + '">' +
+          '<div class="dashboard-action-title">' + escapeDashboardHtml(item.title) + '</div>' +
+          '<div class="text-[11px] text-slate-500 font-bold mt-1 line-clamp-2">' + escapeDashboardHtml(item.subtitle || '') + '</div>' +
+          '<div class="dashboard-action-meta">' + item.badges.map(badge => '<span class="dashboard-action-badge ' + badge.className + '">' + escapeDashboardHtml(badge.text) + '</span>').join('') + '</div>' +
+        '</button>'
+      )).join('');
+      el.querySelectorAll('.dashboard-action-item').forEach(item => {
+        item.addEventListener('click', () => openDashboardResult(item.getAttribute('data-khoa'), item.getAttribute('data-ma-tc')));
+      });
+    }
+
+    function renderDashboardOverview(data) {
+      const stats = data && data.stats ? data.stats : {};
+      const progress = data && data.progress ? data.progress : {};
+      const total = Number(stats.totalCriteria || 0);
+
+      document.getElementById('dashboard-scope').innerText = data && data.scopeLabel ? data.scopeLabel : '--';
+      document.getElementById('dash-stat-total').innerText = dashboardNumber(total);
+      document.getElementById('dash-stat-khoa').innerText = dashboardNumber(stats.totalDepartments || 0);
+      document.getElementById('dash-stat-bv').innerText = dashboardNumber(stats.bvCompleted || 0) + '/' + dashboardNumber(total);
+      document.getElementById('dash-stat-doan').innerText = dashboardNumber(stats.doanCompleted || 0) + '/' + dashboardNumber(total);
+      document.getElementById('dash-stat-diff').innerText = dashboardNumber(stats.diffCount || 0);
+      document.getElementById('dash-stat-updated').innerText = stats.lastUpdated || (data && data.generatedAt) || '--';
+      updateDashboardHealth(data);
+
+      if (!data || total === 0) {
+        document.getElementById('dashboard-content').classList.add('hidden');
+        document.getElementById('dashboard-empty').classList.remove('hidden');
+        document.getElementById('dashboard-empty').classList.add('flex');
+        return;
+      }
+
+      document.getElementById('dashboard-empty').classList.add('hidden');
+      document.getElementById('dashboard-empty').classList.remove('flex');
+      document.getElementById('dashboard-content').classList.remove('hidden');
+
+      document.getElementById('dash-progress-bv-text').innerText = dashboardPercent(progress.bvPercent || 0);
+      document.getElementById('dash-progress-doan-text').innerText = dashboardPercent(progress.doanPercent || 0);
+      document.getElementById('dash-progress-done-text').innerText = dashboardPercent(progress.donePercent || 0);
+      setDashboardBar('dash-progress-bv', progress.bvPercent);
+      setDashboardBar('dash-progress-doan', progress.doanPercent);
+      setDashboardBar('dash-progress-done', progress.donePercent);
+      setDashboardDonut(progress.doanPercent, stats.doanCompleted || 0, total);
+
+      document.getElementById('dash-score-bv-text').innerText = dashboardNumber(stats.totalBV || 0) + ' / ' + dashboardNumber(stats.totalMax || 0) + ' (' + dashboardPercent(progress.scoreBVPercent || 0) + ')';
+      document.getElementById('dash-score-doan-text').innerText = dashboardNumber(stats.totalDoan || 0) + ' / ' + dashboardNumber(stats.totalMax || 0) + ' (' + dashboardPercent(progress.scoreDoanPercent || 0) + ')';
+      document.getElementById('dash-score-gap').innerText = formatDashboardGap(stats.scoreGap || 0);
+      setDashboardBar('dash-score-bv', progress.scoreBVPercent);
+      setDashboardBar('dash-score-doan', progress.scoreDoanPercent);
+
+      renderDashboardActions(data);
+      renderDashboardDepartments(data.departments || []);
+      renderDashboardStatus(data.status || {});
+      renderDashboardPhongs(data.phongs || []);
+      renderDashboardAttention(data.attentionRows || []);
+      renderDashboardActivity(data);
+    }
+
+    function renderDashboardDepartments(rows) {
+      const tbody = document.getElementById('dash-department-body');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="dashboard-empty-row">Không có dữ liệu khoa.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(row => {
+        const diffAttentionClass = 'bg-amber-50 text-amber-700 border-amber-100';
+        const diffNeutralClass = 'bg-slate-100 text-slate-600';
+        const diffClass = Number(row.diffCount || 0) > 0 ? diffAttentionClass : diffNeutralClass;
+        const remaining = Number(row.remainingDoan || 0);
+        const remainingClass = remaining > 0 ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+        return '<tr>' +
+          '<td><div class="font-black text-slate-800">' + escapeDashboardHtml(row.khoa) + '</div><div class="text-[11px] font-bold text-slate-400 mt-1">' + Number(row.totalCriteria || 0) + ' tiêu chí</div></td>' +
+          '<td class="text-center"><span class="dashboard-chip bg-emerald-50 text-emerald-700 border-emerald-100">' + dashboardPercent(row.bvPercent || 0) + '</span></td>' +
+          '<td class="text-center"><span class="dashboard-chip bg-blue-50 text-blue-700 border-blue-100">' + dashboardPercent(row.doanPercent || 0) + '</span></td>' +
+          '<td class="text-center"><span class="dashboard-chip ' + diffClass + '">' + Number(row.diffCount || 0) + '</span></td>' +
+          '<td class="text-center"><span class="dashboard-chip ' + remainingClass + '">' + remaining + '</span></td>' +
+          '<td class="text-center"><button type="button" class="dashboard-link-btn dashboard-khoa-link" data-khoa="' + escapeDashboardHtml(row.khoa) + '"><span class="material-symbols-outlined text-[16px]">open_in_new</span></button></td>' +
+        '</tr>';
+      }).join('');
+
+      tbody.querySelectorAll('.dashboard-khoa-link').forEach(btn => {
+        btn.addEventListener('click', () => openDashboardResult(btn.getAttribute('data-khoa')));
+      });
+    }
+
+    function renderDashboardStatus(status) {
+      const rows = [
+        { label: 'Ch\u01b0a b\u1eaft \u0111\u1ea7u', value: status.notStarted || 0, color: '#64748b' },
+        { label: '\u0110\u01a1n v\u1ecb \u0111ang ch\u1ea5m', value: status.bvInProgress || 0, color: '#0f766e' },
+        { label: 'Ch\u1edd \u0110o\u00e0n ki\u1ec3m tra', value: status.bvDoneAwaitDoan || 0, color: '#2563eb' },
+        { label: '\u0110o\u00e0n \u0111ang ch\u1ea5m', value: status.doanInProgress || 0, color: '#7c3aed' },
+        { label: 'Xong c\u1ea3 hai b\u00ean', value: status.fullyDone || 0, color: '#059669' },
+        { label: 'C\u00f3 ch\u00eanh l\u1ec7ch \u0111i\u1ec3m', value: status.diff || 0, color: '#d97706' }
+      ];
+      const total = rows.slice(0, 5).reduce((sum, row) => sum + Number(row.value || 0), 0);
+      const stack = document.getElementById('dash-status-stack');
+      if (stack) {
+        stack.innerHTML = rows.slice(0, 5).map(row => {
+          const width = total > 0 ? Math.max(0, (Number(row.value || 0) / total) * 100) : 0;
+          return '<div class="dashboard-status-segment" title="' + escapeDashboardHtml(row.label) + ': ' + dashboardNumber(row.value) + '" style="width:' + width + '%;background:' + row.color + '"></div>';
+        }).join('');
+      }
+      document.getElementById('dash-status-list').innerHTML = rows.map(row => (
+        '<div class="dashboard-status-legend-row">' +
+          '<span class="dashboard-status-dot" style="background:' + row.color + '"></span>' +
+          '<div class="dashboard-status-label">' + escapeDashboardHtml(row.label) + '</div>' +
+          '<div class="dashboard-status-value" style="color:' + row.color + '">' + dashboardNumber(row.value) + '</div>' +
+        '</div>'
+      )).join('');
+    }
+
+    function renderDashboardPhongs(rows) {
+      const el = document.getElementById('dash-phong-list');
+      if (!rows.length) {
+        el.innerHTML = '<div class="dashboard-empty-row">Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u ph\u00f2ng.</div>';
+        return;
+      }
+
+      const maxRemaining = Math.max(1, ...rows.map(row => Number(row.remainingDoan || 0)));
+      el.innerHTML = rows.map(row => {
+        const remaining = Number(row.remainingDoan || 0);
+        const diff = Number(row.diffCount || 0);
+        const width = Math.max(0, Math.min(100, (remaining / maxRemaining) * 100));
+        const fillColor = diff > 0 ? '#d97706' : (remaining > 0 ? '#2563eb' : '#059669');
+        return '<div class="dashboard-phong-row">' +
+          '<div class="dashboard-phong-name" title="' + escapeDashboardHtml(row.phong) + '">' + escapeDashboardHtml(row.phong) + '</div>' +
+          '<div class="dashboard-phong-track"><div class="dashboard-phong-fill" style="width:' + width + '%;background:' + fillColor + '"></div></div>' +
+          '<div class="dashboard-phong-meta">\u0110o\u00e0n c\u00f2n ' + remaining + ' | Ch\u00eanh ' + diff + ' | ' + Number(row.totalCriteria || 0) + ' TC</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderDashboardAttention(rows) {
+      const tbody = document.getElementById('dash-attention-body');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="dashboard-empty-row">Không có tiêu chí cần chú ý.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(row => (
+        '<tr class="dashboard-attention-link cursor-pointer" data-khoa="' + escapeDashboardHtml(row.khoa) + '" data-ma-tc="' + escapeDashboardHtml(row.maTC) + '">' +
+          '<td><div class="font-black text-slate-800">' + escapeDashboardHtml(row.khoa) + '</div></td>' +
+          '<td class="text-center"><span class="font-black text-emerald-700">' + escapeDashboardHtml(row.maTC) + '</span></td>' +
+          '<td><div class="font-bold text-slate-700 leading-snug line-clamp-2">' + escapeDashboardHtml(row.noiDung) + '</div></td>' +
+          '<td><span class="text-[11px] font-black text-slate-500">' + escapeDashboardHtml(row.phong || '--') + '</span></td>' +
+          '<td><span class="dashboard-chip bg-amber-50 text-amber-700 border-amber-100">' + escapeDashboardHtml(row.reason || '--') + '</span></td>' +
+        '</tr>'
+      )).join('');
+      tbody.querySelectorAll('.dashboard-attention-link').forEach(row => {
+        row.addEventListener('click', () => openDashboardResult(row.getAttribute('data-khoa'), row.getAttribute('data-ma-tc')));
+      });
+    }
+
+    function renderDashboardActivity(data) {
+      const el = document.getElementById('dash-activity-list');
+      const auditRows = Array.isArray(data.auditRows) ? data.auditRows : [];
+      const recentRows = Array.isArray(data.recentRows) ? data.recentRows : [];
+
+      if (auditRows.length > 0) {
+        document.getElementById('dash-activity-title').innerText = 'Nhật ký gần đây';
+        el.innerHTML = auditRows.map(row => (
+          '<div class="dashboard-activity-row">' +
+            '<div class="min-w-0">' +
+              '<div class="dashboard-activity-title truncate">' + escapeDashboardHtml(row.action || '--') + '</div>' +
+              '<div class="text-[11px] text-slate-400 font-bold mt-1 truncate">' + escapeDashboardHtml(row.actor || '--') + ' · ' + escapeDashboardHtml(row.target || '') + '</div>' +
+            '</div>' +
+            '<div class="dashboard-activity-meta">' + escapeDashboardHtml(row.time || '--') + '</div>' +
+          '</div>'
+        )).join('');
+        return;
+      }
+
+      document.getElementById('dash-activity-title').innerText = 'Cập nhật gần đây';
+      if (!recentRows.length) {
+        el.innerHTML = '<div class="dashboard-empty-row">Chưa có hoạt động gần đây.</div>';
+        return;
+      }
+      el.innerHTML = recentRows.map(row => (
+        '<div class="dashboard-activity-row">' +
+          '<div class="min-w-0">' +
+            '<div class="dashboard-activity-title truncate">' + escapeDashboardHtml(row.khoa) + ' · ' + escapeDashboardHtml(row.maTC) + '</div>' +
+            '<div class="text-[11px] text-slate-400 font-bold mt-1 truncate">' + escapeDashboardHtml(row.trangThai || '--') + '</div>' +
+          '</div>' +
+          '<div class="dashboard-activity-meta">' + escapeDashboardHtml(row.lastUpdated || '--') + '</div>' +
+        '</div>'
+      )).join('');
+    }
+
+    function openDashboardResult(khoa, maTC) {
+      if (typeof switchView !== 'function') return;
+      switchView('view-result');
+
+      if (!khoa) return;
+
+      window.setTimeout(() => {
+        const selector = document.getElementById('result-khoa-selector');
+        if (selector) {
+          const hasOption = Array.from(selector.options).some(opt => opt.value === khoa);
+          if (!hasOption) {
+            selector.add(new Option(khoa, khoa));
+          }
+          selector.value = khoa;
+        }
+        if (typeof loadKetQuaKhoa === 'function') loadKetQuaKhoa(khoa, maTC);
+      }, 80);
+    }
+  </script>
