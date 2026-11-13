@@ -1,0 +1,144 @@
+.overview {
+  background-color: #f9fafb;
+  padding: 4rem 0;
+}
+
+body.dark-mode .overview {
+  background-color: #111827;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.overview-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+body.dark-mode .overview-card {
+  background-color: #1f2937;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+}
+
+.overview-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+body.dark-mode .overview-card:hover {
+  box-shadow: 0 12px 24px rgba(255, 255, 255, 0.15);
+}
+
+.overview-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+  color: white;
+  border-radius: 12px;
+}
+
+.overview-card h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  color: #0066cc;
+}
+
+body.dark-mode .overview-card h3 {
+  color: #60a5fa;
+}
+
+.overview-card p {
+  color: #6b7280;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+body.dark-mode .overview-card p {
+  color: #9ca3af;
+}
+
+.overview-problems {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  border-left: 4px solid #ef4444;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode .overview-problems {
+  background-color: #1f2937;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+}
+
+.overview-problems h3 {
+  color: #ef4444;
+  margin-bottom: 1.5rem;
+  font-size: 1.25rem;
+}
+
+.problems-list {
+  list-style: none;
+}
+
+.problems-list li {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+body.dark-mode .problems-list li {
+  border-bottom-color: #374151;
+}
+
+.problems-list li:last-child {
+  border-bottom: none;
+}
+
+.problems-list li::before {
+  content: '❌';
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.problems-list strong {
+  color: #0066cc;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+body.dark-mode .problems-list strong {
+  color: #60a5fa;
+}
+
+@media (max-width: 768px) {
+  .overview {
+    padding: 2rem 0;
+  }
+
+  .overview-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .overview-problems {
+    padding: 1.5rem;
+  }
+
+  .problems-list li {
+    padding: 0.75rem;
+  }
+}
