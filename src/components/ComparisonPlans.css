@@ -1,6 +1,6 @@
 .comparison-plans {
   background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-  padding: 4rem 0;
+  padding: 2rem 0;
 }
 
 body.dark-mode .comparison-plans {
@@ -10,8 +10,8 @@ body.dark-mode .comparison-plans {
 .plans-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 2rem;
-  margin-bottom: 3rem;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .plan {

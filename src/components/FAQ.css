@@ -1,6 +1,6 @@
 .faq {
   background: white;
-  padding: 4rem 0;
+  padding: 2rem 0;
 }
 
 body.dark-mode .faq {
@@ -103,7 +103,7 @@ body.dark-mode .faq-answer {
   padding: 2rem;
   border-radius: 12px;
   text-align: center;
-  margin-top: 3rem;
+  margin-top: 1.5rem;
 }
 
 body.dark-mode .faq-contact {

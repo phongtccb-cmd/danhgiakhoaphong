@@ -2,7 +2,7 @@
   background: white;
   border-bottom: 2px solid #f3f4f6;
   position: sticky;
-  top: 70px;
+  top: 0;
   z-index: 50;
 }
 
@@ -82,13 +82,7 @@ body.dark-mode .nav-item.active {
 }
 
 .nav-label {
-  display: none;
-}
-
-@media (min-width: 640px) {
-  .nav-label {
-    display: inline;
-  }
+  display: inline;
 }
 
 @media (max-width: 768px) {
@@ -98,7 +92,4 @@ body.dark-mode .nav-item.active {
     gap: 0.25rem;
   }
 
-  .nav-label {
-    display: none;
-  }
 }

@@ -1,6 +1,6 @@
 .timeline {
   background: white;
-  padding: 4rem 0;
+  padding: 2rem 0;
 }
 
 body.dark-mode .timeline {
@@ -10,8 +10,8 @@ body.dark-mode .timeline {
 .weeks-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 2rem;
-  margin-bottom: 3rem;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .week-card {

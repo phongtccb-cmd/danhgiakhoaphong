@@ -6,12 +6,12 @@ export default function Overview() {
     {
       icon: CheckCircle,
       title: 'Toàn diện',
-      description: '6 lĩnh vực bao phủ 100% hoạt động khoa phòng'
+      description: 'Đánh giá nhiều mặt hoạt động khoa phòng'
     },
     {
       icon: TrendingUp,
       title: 'Khách quan',
-      description: '36+ chỉ tiêu cụ thể, đo lường được từ dữ liệu thực tế'
+      description: 'Dựa trên chỉ tiêu và dữ liệu có thể kiểm chứng'
     },
     {
       icon: Users,
@@ -29,8 +29,7 @@ export default function Overview() {
     <section className="overview section">
       <div className="container">
         <div className="section-title">
-          <h2>Tại sao cần hệ thống đánh giá?</h2>
-          <p>Bệnh viện đã chạy hơn 20 năm mà chưa có hệ thống đánh giá định kỳ. Đây là vấn đề cấp bách cần giải quyết.</p>
+          <h2>Nguyên tắc đánh giá</h2>
         </div>
 
         <div className="overview-grid">
@@ -48,23 +47,6 @@ export default function Overview() {
           })}
         </div>
 
-        <div className="overview-problems">
-          <h3>Vấn đề hiện tại:</h3>
-          <ul className="problems-list">
-            <li>
-              <strong>Không có hệ thống đánh giá định kỳ:</strong> Khen/phạt căn cứ vào quan hệ cá nhân → Bất công
-            </li>
-            <li>
-              <strong>Khó phân loại 20%-30%-50%:</strong> Không có tiêu chí rõ ràng → Chỉ có cảm giác, không có số liệu
-            </li>
-            <li>
-              <strong>Không đánh giá an toàn:</strong> Bộ Y tế yêu cầu mọi BV phải đo lường chỉ tiêu an toàn
-            </li>
-            <li>
-              <strong>Sẽ bị kiểm toán:</strong> Khi thanh tra Bộ Y tế gặp câu hỏi "BV có hệ thống đánh giá gì?" → Bệnh viện không có câu trả lời thuyết phục
-            </li>
-          </ul>
-        </div>
       </div>
     </section>
   )

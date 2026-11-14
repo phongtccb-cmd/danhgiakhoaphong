@@ -1,6 +1,6 @@
 .evaluation-system {
   background: white;
-  padding: 4rem 0;
+  padding: 2rem 0;
 }
 
 body.dark-mode .evaluation-system {
@@ -10,8 +10,8 @@ body.dark-mode .evaluation-system {
 .domains-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-  margin-bottom: 4rem;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .domain-card {
@@ -34,7 +34,7 @@ body.dark-mode .domain-card {
 }
 
 .domain-header {
-  padding: 1.5rem;
+  padding: 1rem;
   color: white;
   display: flex;
   justify-content: space-between;
@@ -57,7 +57,7 @@ body.dark-mode .domain-card {
 }
 
 .domain-content {
-  padding: 1.5rem;
+  padding: 1rem;
 }
 
 .domain-description {
@@ -92,9 +92,9 @@ body.dark-mode .criterion-tag {
 
 .weight-distribution {
   background: #f9fafb;
-  padding: 2rem;
+  padding: 1.25rem;
   border-radius: 12px;
-  margin-bottom: 3rem;
+  margin-bottom: 1.5rem;
 }
 
 body.dark-mode .weight-distribution {
@@ -102,13 +102,13 @@ body.dark-mode .weight-distribution {
 }
 
 .weight-distribution h3 {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .weight-bars {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.75rem;
 }
 
 .weight-item {
@@ -167,7 +167,7 @@ body.dark-mode .weight-bar-container {
 }
 
 .scoring-table {
-  margin-bottom: 3rem;
+  margin-bottom: 1.5rem;
 }
 
 .scoring-table h3 {
@@ -254,7 +254,7 @@ body.dark-mode tr:hover {
 
 .key-principles {
   background: #f9fafb;
-  padding: 2rem;
+  padding: 1.25rem;
   border-radius: 12px;
 }
 
@@ -263,13 +263,13 @@ body.dark-mode .key-principles {
 }
 
 .key-principles h3 {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .principles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 2rem;
+  gap: 1rem;
 }
 
 .principle {

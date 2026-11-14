@@ -1,10 +1,7 @@
-import { Menu, X, Moon, Sun } from 'lucide-react'
-import { useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
 import './Header.css'
 
 export default function Header({ darkMode, toggleDarkMode }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
   return (
     <header className="header">
       <div className="header-container">
@@ -26,12 +23,6 @@ export default function Header({ darkMode, toggleDarkMode }) {
         <div className="header-actions">
           <button className="theme-toggle" onClick={toggleDarkMode} title="Chuyển đổi chế độ tối">
             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-          <button 
-            className="mobile-menu-toggle" 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </div>

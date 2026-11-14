@@ -3,9 +3,6 @@
   color: white;
   padding: 1rem 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 0;
-  z-index: 100;
   transition: all 0.3s ease;
 }
 
@@ -76,24 +73,6 @@ body.dark-mode .header {
   transform: scale(1.05);
 }
 
-.mobile-menu-toggle {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.mobile-menu-toggle:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
 @media (max-width: 768px) {
   .header-logo {
     gap: 0.5rem;
@@ -105,10 +84,6 @@ body.dark-mode .header {
 
   .logo-text p {
     display: none;
-  }
-
-  .mobile-menu-toggle {
-    display: flex;
   }
 
   .logo-img {
