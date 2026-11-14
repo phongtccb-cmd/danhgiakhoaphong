@@ -9,12 +9,12 @@ export default function FAQ() {
     {
       id: 1,
       question: 'Tại sao cần 6 lĩnh vực, không phải 4 (như Balanced Scorecard)?',
-      answer: 'Tiêu chuẩn quốc tế (WHO, JCI, ISO) bắt buộc đánh giá An toàn riêng biệt. Bộ Y tế cũng yêu cầu các chỉ tiêu về tai nạn y khoa, lây nhiễm. Nếu không có → Bệnh viện sẽ bị kiểm toán. Do đó, An toàn được tách riêng thành lĩnh vực 5, chiếm 20% (tương đương quản lý & tài chính).'
+      answer: 'Khung đề xuất điều chỉnh Balanced Scorecard theo bối cảnh bệnh viện: 5 lĩnh vực chung chiếm 95% và chỉ tiêu riêng chiếm 5%. An toàn người bệnh và môi trường y tế được bố trí 19%; đây là trọng số đề xuất, không phải tỷ lệ bắt buộc của WHO hay nghiên cứu Amer.'
     },
     {
       id: 2,
       question: 'Khoa ngoài sẽ luôn xếp cao hơn khoa nội vì doanh thu?',
-      answer: 'KHÔNG. Hệ thống so sánh riêng trong loại (khoa ngoài vs khoa ngoài; khoa nội vs khoa nội). Ngoài ra, doanh thu chỉ chiếm ~3-4% tổng điểm (1/6 chỉ tiêu × 20%). Chất lượng + An toàn chiếm 35% → Quan trọng hơn nhiều.'
+      answer: 'Cần so sánh trong các nhóm có chức năng tương đồng. Lĩnh vực tài chính 19% sử dụng chỉ tiêu phù hợp từng đơn vị: phòng hành chính không bị áp doanh thu hoặc lợi nhuận. Chất lượng và an toàn chiếm tổng cộng 42%; chỉ tiêu và cách chấm cần được công bố trước.'
     },
     {
       id: 3,
@@ -39,7 +39,7 @@ export default function FAQ() {
     {
       id: 7,
       question: 'PLAN A và PLAN B khác nhau như thế nào?',
-      answer: 'PLAN A (Benchmarking): Lấy trọng số từ 5 BV khác, phụ thuộc vào email từ họ. PLAN B (WHO Standards): Lấy từ tiêu chuẩn WHO, không phụ thuộc ai, tự chủ 100%. Trigger: Nếu ≥3 BV trả lời → PLAN A. Nếu <3 → PLAN B. Hoặc BGĐ chọn chủ động PLAN B.'
+      answer: 'PLAN A tham khảo dữ liệu từ các bệnh viện tương đồng. PLAN B tham khảo các tài liệu quốc tế và điều chỉnh theo dữ liệu nội bộ; các tổ chức quốc tế không quy định sẵn bộ trọng số này. BGĐ xem xét lựa chọn phương án phù hợp.'
     },
     {
       id: 8,
@@ -54,7 +54,7 @@ export default function FAQ() {
     {
       id: 10,
       question: 'Nếu PLAN B được chọn, bước tiếp theo là gì?',
-      answer: 'Dùng PLAN_B_PHAN_2_Template để nhập dữ liệu từ FORM_01 vào, tính điểm theo công thức WHO. Template đã có sẵn, chỉ cần điền số liệu. Nhanh hơn PLAN A vì không phải chờ BV khác.'
+      answer: 'Sử dụng dữ liệu nội bộ và tài liệu tham khảo để xây dựng phương án, sau đó rà soát chỉ tiêu, trọng số và cách tính với các đơn vị trước khi trình BGĐ.'
     },
   ]
 

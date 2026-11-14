@@ -55,13 +55,13 @@ export default function ComparisonPlans() {
           {/* PLAN B */}
           <div className="plan plan-b">
             <div className="plan-header">
-              <h3>PLAN B: WHO Standards</h3>
+              <h3>PLAN B: Tham khảo quốc tế</h3>
               <span className="plan-badge">Tiêu chuẩn quốc tế</span>
             </div>
             <div className="plan-content">
               <div className="plan-section">
                 <h4>Phương pháp</h4>
-                <p>Lấy trọng số từ tiêu chuẩn WHO, JCI, ISO</p>
+                <p>Tham khảo tài liệu quốc tế và điều chỉnh theo dữ liệu nội bộ bệnh viện.</p>
               </div>
               <div className="plan-section">
                 <h4>⏱️ Lịch trình</h4>
@@ -75,9 +75,8 @@ export default function ComparisonPlans() {
                 <h4>✅ Ưu điểm</h4>
                 <ul>
                   <li>Không phụ thuộc vào ai, tự chủ hoàn toàn</li>
-                  <li>Dựa trên tiêu chuẩn quốc tế (WHO, JCI)</li>
-                  <li>Khi thanh tra Bộ Y tế → Được khen</li>
-                  <li>An toàn được tăng lên 20% (từ 10%)</li>
+                  <li>Tham khảo các tài liệu quốc tế (WHO, JCI)</li>
+                  <li>Trọng số an toàn đề xuất là 19%, cần được bệnh viện xem xét</li>
                 </ul>
               </div>
               <div className="plan-section">
@@ -102,14 +101,14 @@ export default function ComparisonPlans() {
               <tr>
                 <th>Tiêu chí</th>
                 <th>PLAN A (Benchmarking)</th>
-                <th>PLAN B (WHO Standards)</th>
+                <th>PLAN B (Tham khảo quốc tế)</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><strong>Căn cứ</strong></td>
                 <td>Dữ liệu từ 5 BV tương đồng</td>
-                <td>Tiêu chuẩn WHO, JCI, ISO</td>
+                <td>Tham khảo WHO, JCI, ISO và dữ liệu nội bộ</td>
               </tr>
               <tr>
                 <td><strong>Phụ thuộc</strong></td>
@@ -124,7 +123,7 @@ export default function ComparisonPlans() {
               <tr>
                 <td><strong>An toàn %</strong></td>
                 <td>10-15% (chờ BV)</td>
-                <td>20% (WHO chuẩn)</td>
+                <td>19% (đề xuất, không phải chuẩn WHO)</td>
               </tr>
               <tr>
                 <td><strong>Độc lập</strong></td>
@@ -157,7 +156,7 @@ export default function ComparisonPlans() {
           </div>
           <div className="timeline-info">
             <p>✅ ≥3 BV → PLAN A (Benchmarking)</p>
-            <p>❌ &lt;3 BV → PLAN B (WHO Standards)</p>
+            <p>❌ &lt;3 BV → PLAN B (tham khảo quốc tế)</p>
           </div>
         </div>
       </div>

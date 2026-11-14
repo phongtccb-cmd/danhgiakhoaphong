@@ -90,6 +90,40 @@ body.dark-mode .criterion-tag {
   color: #e5e7eb;
 }
 
+.specific-indicators {
+  background: #f9fafb;
+  padding: 1.25rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+body.dark-mode .specific-indicators {
+  background-color: #1f2937;
+}
+
+.specific-indicators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.specific-indicators-grid h4 {
+  margin-bottom: 0.5rem;
+}
+
+.specific-indicators-grid ul {
+  padding-left: 1.25rem;
+}
+
+.specific-indicators-grid li {
+  margin-bottom: 0.5rem;
+}
+
+.indicator-note {
+  margin: 1rem 0 0;
+  font-weight: 500;
+}
+
 .weight-distribution {
   background: #f9fafb;
   padding: 1.25rem;

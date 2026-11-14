@@ -4,51 +4,51 @@ export default function EvaluationSystem() {
   const domains = [
     {
       id: 1,
-      name: 'Quản lý tổ chức',
+      name: 'Quản lý tổ chức & Chuyển đổi số',
       weight: '18%',
       color: '#3b82f6',
-      criteria: ['Kỷ luật', 'Vắng mặt', 'Kế hoạch', 'Báo cáo'],
-      description: 'Quản lý hành chính, kỷ luật nhân viên, lập kế hoạch'
+      criteria: ['Kỷ luật', 'Vắng mặt', 'Kế hoạch', 'Báo cáo đúng hạn', 'Ứng dụng CNTT'],
+      description: 'Quản lý tổ chức và ứng dụng công nghệ phù hợp với nhiệm vụ của đơn vị.'
     },
     {
       id: 2,
-      name: 'Chất lượng dịch vụ',
+      name: 'Chất lượng chuyên môn & Trải nghiệm người bệnh',
       weight: '23%',
       color: '#10b981',
-      criteria: ['Hài lòng BN', 'Biến chứng', 'Lây nhiễm', 'Chất lượng'],
-      description: 'Hài lòng bệnh nhân, biến chứng, lây nhiễm bệnh viện'
+      criteria: ['Hài lòng người bệnh', 'Tuân thủ phác đồ', 'Thời gian chờ', 'Ngày điều trị', 'Công suất giường'],
+      description: 'Chất lượng chuyên môn, trải nghiệm người bệnh, thời gian và hiệu suất vận hành.'
     },
     {
       id: 3,
-      name: 'Tài chính-Kinh tế',
+      name: 'Tài chính - Kinh tế',
       weight: '19%',
       color: '#f59e0b',
-      criteria: ['Doanh thu', 'Chi phí', 'Lợi nhuận', 'Bù đắp'],
-      description: 'Doanh thu, chi phí hoạt động, lợi nhuận'
+      criteria: ['Chi phí', 'Chênh lệch thu chi', 'Xuất toán BHYT', 'Định mức', 'Giải ngân'],
+      description: 'Chọn chỉ tiêu theo chức năng: thu chi và BHYT cho đơn vị có nguồn thu; định mức chi phí và giải ngân cho phòng chức năng.'
     },
     {
       id: 4,
-      name: 'Nhân sự-Đào tạo',
+      name: 'Nhân sự - Đào tạo & Nghiên cứu khoa học',
       weight: '16%',
       color: '#8b5cf6',
-      criteria: ['Đào tạo', 'Chứng chỉ', 'Giữ chân', 'Phát triển'],
-      description: 'Đào tạo, chứng chỉ hành nghề, phát triển nhân sự'
+      criteria: ['Đào tạo liên tục', 'Chứng chỉ hành nghề', 'Giữ chân nhân sự', 'Nghiên cứu', 'Sáng kiến'],
+      description: 'Phát triển nhân sự, đào tạo và nghiên cứu hoặc sáng kiến phù hợp nhiệm vụ.'
     },
     {
       id: 5,
-      name: 'An toàn-Vệ sinh',
-      weight: '20%',
+      name: 'An toàn người bệnh & Môi trường y tế',
+      weight: '19%',
       color: '#ef4444',
-      criteria: ['Tai nạn', 'ATVSLD', 'PCCC', 'Vệ sinh'],
-      description: 'Tai nạn y khoa, an toàn lao động, phòng cháy chữa cháy'
+      criteria: ['Sự cố và biến chứng', 'Kiểm soát nhiễm khuẩn', 'Chất thải y tế', 'ATVSLĐ', 'PCCC'],
+      description: 'An toàn lâm sàng, kiểm soát nhiễm khuẩn, an toàn lao động và môi trường y tế.'
     },
     {
       id: 6,
       name: 'Chỉ tiêu riêng',
       weight: '5%',
       color: '#06b6d4',
-      criteria: ['Tùy loại', 'Riêng biệt', 'Cụ thể', 'Phù hợp'],
-      description: 'Chỉ tiêu riêng tùy theo loại khoa phòng'
+      criteria: ['Lâm sàng', 'Cận lâm sàng', 'Phòng chức năng'],
+      description: 'Chỉ tiêu đặc thù phù hợp với chức năng của từng nhóm khoa, phòng.'
     }
   ]
 
@@ -56,8 +56,51 @@ export default function EvaluationSystem() {
     <section className="evaluation-system section">
       <div className="container">
         <div className="section-title">
-          <h2>Hệ thống 6 Lĩnh vực Đánh giá</h2>
-          <p>Dựa trên Balanced Scorecard + Tiêu chuẩn quốc tế (WHO, JCI, ISO)</p>
+          <h2>Đề xuất 6 lĩnh vực đánh giá</h2>
+          <p>5 lĩnh vực chung (95%) và chỉ tiêu riêng (5%); tổng trọng số 100%.</p>
+          <p>
+            Tham khảo các chiều kích trong{' '}
+            <a href="https://doi.org/10.1186/s12913-022-07863-0" target="_blank" rel="noopener noreferrer">
+              Amer và cộng sự (2022)
+            </a>
+            . Trọng số là đề xuất của bệnh viện, không phải trọng số do nghiên cứu quy định.
+          </p>
+        </div>
+
+        <div className="specific-indicators">
+          <h3>Gợi ý chỉ tiêu riêng theo khối</h3>
+          <p>Các ví dụ cần được lựa chọn và phê duyệt theo chức năng, nguồn dữ liệu và trách nhiệm của từng đơn vị.</p>
+          <div className="specific-indicators-grid">
+            <div>
+              <h4>Lâm sàng</h4>
+              <ul>
+                <li>Triển khai kỹ thuật mới, kỹ thuật chuyên sâu.</li>
+                <li>Chuyển tuyến trên không phù hợp; phẫu thuật đúng giờ với khoa có phẫu thuật.</li>
+                <li>Mổ lại ngoài dự kiến: xem xét trong lĩnh vực an toàn.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Cận lâm sàng</h4>
+              <ul>
+                <li>Trả kết quả xét nghiệm hoặc chẩn đoán hình ảnh cấp cứu đúng thời hạn.</li>
+                <li>Đứt gãy thuốc, hóa chất, vật tư; sai sót cấp phát thuốc của khoa Dược.</li>
+                <li>Kết quả ngoại kiểm chất lượng xét nghiệm theo yêu cầu áp dụng.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Phòng chức năng</h4>
+              <ul>
+                <li>KHTH/QLCL: hoàn thành đề án cải tiến, theo dõi kết quả đánh giá chất lượng.</li>
+                <li>Vật tư - thiết bị y tế: khắc phục sự cố và bảo trì đúng hạn.</li>
+                <li>Tài chính - kế toán: thu hồi công nợ BHYT và chi trả đúng hạn theo trách nhiệm.</li>
+              </ul>
+            </div>
+          </div>
+          <p className="indicator-note">
+            Mỗi chỉ tiêu hoặc sự kiện chỉ được chấm một lần: phân công trước vào lĩnh vực chung hoặc chỉ tiêu riêng.
+            Đặc biệt, biến chứng, nhiễm khuẩn, mổ lại ngoài dự kiến và sai sót cấp phát thuộc lĩnh vực an toàn;
+            không chấm lặp trong chỉ tiêu riêng. Với phòng hành chính, không áp chỉ tiêu doanh thu hoặc lợi nhuận.
+          </p>
         </div>
 
         <div className="domains-grid">
@@ -103,7 +146,8 @@ export default function EvaluationSystem() {
         </div>
 
         <div className="scoring-table">
-          <h3>Thang điểm & Phân loại</h3>
+          <h3>Thang điểm & Phân loại tham khảo</h3>
+          <p>Ngưỡng điểm và cách áp dụng tỷ lệ cần được phê duyệt; ngưỡng cố định không tự bảo đảm tỷ lệ xếp nhóm.</p>
           <table>
             <thead>
               <tr>
@@ -133,14 +177,14 @@ export default function EvaluationSystem() {
                 <td><span className="group-badge">C</span></td>
                 <td><strong>Bình thường</strong></td>
                 <td>60-74</td>
-                <td>50%</td>
+                <td>Trong 50% còn lại</td>
                 <td>Hoàn thành cơ bản, cần cải thiện</td>
               </tr>
               <tr className="group-d">
                 <td><span className="group-badge">D</span></td>
                 <td><strong>Chưa đạt</strong></td>
                 <td>&lt;60</td>
-                <td>Riêng</td>
+                <td>Trong 50% còn lại</td>
                 <td>Cần xử lý, hỗ trợ cụ thể</td>
               </tr>
             </tbody>
