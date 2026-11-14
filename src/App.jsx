@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import Header from './components/Header'
 import Navigation from './components/Navigation'
-import Hero from './components/Hero'
 import Overview from './components/Overview'
 import EvaluationSystem from './components/EvaluationSystem'
-import ComparisonPlans from './components/ComparisonPlans'
 import Timeline from './components/Timeline'
 import Dashboard from './components/Dashboard'
 import FAQ from './components/FAQ'
@@ -31,15 +29,9 @@ function App() {
       <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
       <Navigation currentPage={currentPage} setCurrentPage={setCurrentPage} />
       
-      {currentPage === 'home' && (
-        <>
-          <Hero setCurrentPage={setCurrentPage} />
-          <Overview />
-        </>
-      )}
+      {currentPage === 'home' && <Overview />}
 
       {currentPage === 'system' && <EvaluationSystem />}
-      {currentPage === 'comparison' && <ComparisonPlans />}
       {currentPage === 'timeline' && <Timeline />}
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'faq' && <FAQ />}
