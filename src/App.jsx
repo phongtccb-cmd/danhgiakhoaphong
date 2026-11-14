@@ -7,6 +7,7 @@ import Timeline from './components/Timeline'
 import Dashboard from './components/Dashboard'
 import FAQ from './components/FAQ'
 import SharedData from './components/SharedData'
+import MonthlyTracker from './components/MonthlyTracker'
 import Footer from './components/Footer'
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'faq' && <FAQ />}
       {currentPage === 'data' && <SharedData />}
+      {currentPage === 'monitor' && <MonthlyTracker />}
 
       <Footer />
     </div>
