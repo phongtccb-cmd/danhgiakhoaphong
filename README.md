@@ -82,6 +82,15 @@ npm run build
 - Người được cấp quyền nhập điểm chỉ tiêu tạm thời theo thang 0–100 và liên kết `http`/`https` cho đơn vị được giao; người chưa đăng nhập chỉ xem dữ liệu công khai. Chức năng chưa tự tính điểm tổng hay xếp loại. Liên kết minh chứng cần có quyền truy cập phù hợp và không chứa dữ liệu nhạy cảm.
 - Tài khoản được tạo trong Firebase Console, không tạo từ website. Chức năng không tải tệp minh chứng và không tự xóa dữ liệu.
 
+### Theo dõi tháng và tổng hợp kỳ
+
+- Mục **Theo dõi định kỳ** là nền tảng thử nghiệm: quản trị viên tạo định nghĩa theo dõi và gán chỉ tiêu cho đơn vị đã có trong danh mục; gợi ý trên trang không được tự động áp dụng.
+- Định nghĩa theo dõi và việc gán hiện chỉ được tạo mới, không sửa/xóa trên giao diện. Không có hiệu lực theo ngày; phải rà soát trước khi tạo và không dùng để thay đổi phạm vi chỉ tiêu theo từng kỳ. Danh mục này tách khỏi danh mục điểm nhập thủ công hiện có.
+- Người được cấp quyền nhập dữ liệu tháng của đơn vị: số liệu, thiếu dữ liệu, chưa đến kỳ đo hoặc không phát sinh. Không gán chỉ tiêu cho đơn vị nghĩa là chưa cấu hình áp dụng, không phải điểm 0.
+- Tổng hợp quý hoặc năm chỉ hiện số khi đã ghi trạng thái cho tất cả các tháng trong kỳ. Tỷ lệ gộp tử số và mẫu số rồi nhân 100; cộng dồn cộng giá trị tháng; giá trị gần nhất lấy tháng có số liệu cuối cùng trong kỳ. Mẫu số bằng 0 được ghi là không phát sinh, không tính tỷ lệ. Tỷ suất cần hệ số khác 100 và các phương pháp khác chưa được hỗ trợ.
+- Các số liệu trên trang chưa được xác nhận, khóa kỳ, tự động chấm điểm, tính trọng số hay xếp hạng. Những quy tắc này cần được bệnh viện phê duyệt trước khi triển khai.
+- Cần cập nhật lại Firestore Rules từ `firestore.rules` và kiểm thử quyền sau khi thêm chức năng này; việc tải tệp lên GitHub không tự công bố quy tắc.
+
 ## 📊 Thang điểm
 
 | Điểm | Mức đánh giá |

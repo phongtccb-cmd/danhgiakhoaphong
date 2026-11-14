@@ -73,5 +73,78 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
+
+    match /monitorIndicators/{id} {
+      allow read: if true;
+      allow create: if admin()
+        && id.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.keys().hasOnly(['name', 'domain', 'method', 'source', 'unit'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
+        && request.resource.data.domain in ['management', 'quality', 'finance', 'staff', 'safety', 'specific']
+        && request.resource.data.method in ['ratio', 'sum', 'last']
+        && request.resource.data.source is string && request.resource.data.source.size() <= 500
+        && request.resource.data.unit is string && request.resource.data.unit.size() <= 60;
+      allow update, delete: if false;
+    }
+
+    match /monitorAssignments/{id} {
+      allow read: if true;
+      allow create: if admin()
+        && request.resource.data.keys().hasOnly(['unitId', 'indicatorId'])
+        && request.resource.data.unitId is string
+        && request.resource.data.unitId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.indicatorId is string
+        && request.resource.data.indicatorId.matches('^[A-Za-z0-9]{20}$')
+        && id == request.resource.data.unitId + '_' + request.resource.data.indicatorId
+        && exists(/databases/$(database)/documents/units/$(request.resource.data.unitId))
+        && exists(/databases/$(database)/documents/monitorIndicators/$(request.resource.data.indicatorId));
+      allow update, delete: if false;
+    }
+
+    match /monthlyRecords/{id} {
+      function definition() {
+        return get(/databases/$(database)/documents/monitorIndicators/$(request.resource.data.indicatorId)).data;
+      }
+      function validValues() {
+        return (request.resource.data.status != 'collected'
+          && request.resource.data.numerator == null
+          && request.resource.data.denominator == null
+          && request.resource.data.value == null)
+          || (request.resource.data.status == 'collected'
+          && ((definition().method == 'ratio'
+            && request.resource.data.numerator is number && request.resource.data.numerator >= 0
+            && request.resource.data.denominator is number && request.resource.data.denominator > 0
+            && request.resource.data.value == null)
+          || (definition().method in ['sum', 'last']
+            && request.resource.data.value is number && request.resource.data.value >= 0
+            && request.resource.data.numerator == null
+            && request.resource.data.denominator == null)));
+      }
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly([
+          'unitId', 'indicatorId', 'year', 'month', 'status', 'numerator',
+          'denominator', 'value', 'evidenceUrl', 'note', 'updatedAt'
+        ])
+        && request.resource.data.unitId is string
+        && request.resource.data.unitId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.indicatorId is string
+        && request.resource.data.indicatorId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.year is string
+        && request.resource.data.year.matches('^(20[0-9]{2}|2100)$')
+        && request.resource.data.month is string
+        && request.resource.data.month.matches('^(0[1-9]|1[0-2])$')
+        && id == request.resource.data.unitId + '_' + request.resource.data.indicatorId + '_' + request.resource.data.year + '_' + request.resource.data.month
+        && exists(/databases/$(database)/documents/monitorAssignments/$(request.resource.data.unitId + '_' + request.resource.data.indicatorId))
+        && exists(/databases/$(database)/documents/monitorIndicators/$(request.resource.data.indicatorId))
+        && canEditUnit(request.resource.data.unitId)
+        && request.resource.data.status in ['collected', 'missing', 'not_due', 'no_occurrence']
+        && validValues()
+        && request.resource.data.evidenceUrl is string && request.resource.data.evidenceUrl.size() <= 2048
+        && (request.resource.data.evidenceUrl == '' || request.resource.data.evidenceUrl.matches('^https?://[^\\s]+$'))
+        && request.resource.data.note is string && request.resource.data.note.size() <= 2000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
   }
 }
