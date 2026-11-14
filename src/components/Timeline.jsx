@@ -14,7 +14,7 @@ export default function Timeline() {
     },
     {
       week: 2,
-      title: 'Phân tích theo phương án B',
+      title: 'Phân tích dữ liệu',
       dates: '18-24.11.2026',
       color: '#f59e0b',
       tasks: [

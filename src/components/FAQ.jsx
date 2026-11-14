@@ -38,8 +38,8 @@ export default function FAQ() {
     },
     {
       id: 7,
-      question: 'Bệnh viện sử dụng phương án nào?',
-      answer: 'Phương án B đã được lựa chọn: tham khảo dữ liệu, tài liệu WHO và điều chỉnh theo báo cáo, tình hình thực tế tại bệnh viện. WHO không quy định sẵn bộ trọng số này.'
+      question: 'Căn cứ xây dựng hệ thống đánh giá là gì?',
+      answer: 'Tham khảo dữ liệu, tài liệu WHO và điều chỉnh theo báo cáo, tình hình thực tế tại bệnh viện. WHO không quy định sẵn bộ trọng số này.'
     },
     {
       id: 8,
@@ -53,7 +53,7 @@ export default function FAQ() {
     },
     {
       id: 10,
-      question: 'Bước tiếp theo của phương án B là gì?',
+      question: 'Bước tiếp theo trong xây dựng hệ thống là gì?',
       answer: 'Sử dụng dữ liệu nội bộ và tài liệu tham khảo để xây dựng phương án, sau đó rà soát chỉ tiêu, trọng số và cách tính với các đơn vị trước khi trình BGĐ.'
     },
   ]

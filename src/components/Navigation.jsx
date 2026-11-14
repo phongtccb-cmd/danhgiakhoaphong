@@ -4,7 +4,6 @@ export default function Navigation({ currentPage, setCurrentPage }) {
   const navItems = [
     { id: 'home', label: 'Trang chủ', icon: '🏠' },
     { id: 'system', label: 'Hệ thống đánh giá', icon: '📊' },
-    { id: 'comparison', label: 'Phương án B', icon: '⚖️' },
     { id: 'timeline', label: 'Lịch trình', icon: '📅' },
     { id: 'dashboard', label: 'Dashboard', icon: '📈' },
     { id: 'faq', label: 'Câu hỏi thường gặp', icon: '❓' },
