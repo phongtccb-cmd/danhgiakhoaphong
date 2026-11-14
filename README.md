@@ -10,7 +10,7 @@ Hệ thống đánh giá hoạt động của 49 phòng, khoa và cơ sở thu�
 - 7 khoa cận lâm sàng (không tính khoa Dược)
 
 Khung đánh giá gồm:
-- **6 lĩnh vực chính** (Quản lý, Chất lượng, Tài chính, Nhân sự, An toàn, Chỉ tiêu riêng)
+- **5 lĩnh vực chính** (Quản lý 19%, Chất lượng 24%, Tài chính 20%, Nhân sự 17%, An toàn 20%)
 - Tham khảo dữ liệu, tài liệu WHO và điều chỉnh theo báo cáo, tình hình thực tế tại bệnh viện
 - **Công bằng, khách quan, minh bạch**
 
@@ -78,18 +78,22 @@ npm run build
 - Bật Email/Password trong Firebase Authentication → Sign-in method. Thêm tên miền website vào Authentication → Settings → Authorized domains nếu chưa có.
 - Quản trị viên ban đầu là UID được cấu hình trong `src/firebase.js` và `firestore.rules`; hai giá trị phải khớp. Không chia sẻ mật khẩu hoặc khóa dịch vụ.
 - Tạo tài khoản Email/Password trong Firebase Authentication → Users. Trong website → Dữ liệu đánh giá, quản trị viên nhập UID và chọn đơn vị được phép sửa; danh sách trống thu hồi quyền sửa.
-- Quản trị viên thêm hoặc sửa kỳ đánh giá, danh sách đơn vị và chỉ tiêu. Danh mục khởi đầu trống cho đến khi có dữ liệu chính thức.
-- Người được cấp quyền nhập điểm chỉ tiêu tạm thời theo thang 0–100 và liên kết `http`/`https` cho đơn vị được giao; người chưa đăng nhập chỉ xem dữ liệu công khai. Chức năng chưa tự tính điểm tổng hay xếp loại. Liên kết minh chứng cần có quyền truy cập phù hợp và không chứa dữ liệu nhạy cảm.
+- Quản trị viên có thể xem và nhập các đơn vị còn thiếu theo Quyết định 949 tại mục **Dữ liệu đánh giá**. Danh sách gồm 49 đơn vị; Khoa Truyền nhiễm tạm ghép Khoa Nội tổng hợp và không tạo đơn vị riêng. Việc nhập không tự chạy, không sửa hoặc xóa đơn vị có sẵn; tên khác, nhóm sai hoặc tên trùng phải được đối chiếu trước. Không nhập danh mục đồng thời từ nơi khác.
+- Sau khi đủ 49 đơn vị, quản trị viên dùng **Nạp tiêu chí và phân công theo CSV** để thêm bộ tiêu chí đo lường và gán theo nhóm. Tệp có 43 tiêu chí đo lường và 2 dòng điểm tham chiếu không nhập số liệu.
+- Tab **Dữ liệu đánh giá** chia 3 nhóm đơn vị; chọn đơn vị, tháng và năm để xem/cập nhật từng tiêu chí theo CSV. Tài khoản chỉ nhập cho đơn vị được cấp quyền.
+- Ngưỡng CSV là tham khảo và một số trường đo/ngưỡng còn thiếu hoặc cần rà soát. Hệ thống lưu số liệu tháng, không tự kết luận đạt/chưa đạt, cộng điểm hoặc xếp hạng. Liên kết minh chứng cần có quyền truy cập phù hợp và không chứa dữ liệu nhạy cảm.
 - Tài khoản được tạo trong Firebase Console, không tạo từ website. Chức năng không tải tệp minh chứng và không tự xóa dữ liệu.
 
 ### Theo dõi tháng và tổng hợp kỳ
 
-- Mục **Theo dõi định kỳ** là nền tảng thử nghiệm: quản trị viên tạo định nghĩa theo dõi và gán chỉ tiêu cho đơn vị đã có trong danh mục; gợi ý trên trang không được tự động áp dụng.
+- Bảng theo dõi lấy danh mục đơn vị từ Firebase và đối chiếu số lượng theo 3 nhóm (11/31/7); chưa đủ dữ liệu thì chỉ hiển thị những đơn vị đã có. Chọn tên đơn vị để xem các khía cạnh và số liệu chỉ tiêu đã gán.
+- Dấu “—”, tình trạng đạt/chưa đạt và điểm cộng/trừ chưa được tính khi chưa có quy định chấm điểm; không hiểu dữ liệu thiếu là 0 điểm.
+- Mục **Theo dõi định kỳ** là công cụ thử nghiệm riêng, giữ lại cấu hình theo dõi thủ công; tab **Dữ liệu đánh giá** là nơi dùng bộ tiêu chí CSV.
 - Định nghĩa theo dõi và việc gán hiện chỉ được tạo mới, không sửa/xóa trên giao diện. Không có hiệu lực theo ngày; phải rà soát trước khi tạo và không dùng để thay đổi phạm vi chỉ tiêu theo từng kỳ. Danh mục này tách khỏi danh mục điểm nhập thủ công hiện có.
 - Người được cấp quyền nhập dữ liệu tháng của đơn vị: số liệu, thiếu dữ liệu, chưa đến kỳ đo hoặc không phát sinh. Không gán chỉ tiêu cho đơn vị nghĩa là chưa cấu hình áp dụng, không phải điểm 0.
-- Tổng hợp quý hoặc năm chỉ hiện số khi đã ghi trạng thái cho tất cả các tháng trong kỳ. Tỷ lệ gộp tử số và mẫu số rồi nhân 100; cộng dồn cộng giá trị tháng; giá trị gần nhất lấy tháng có số liệu cuối cùng trong kỳ. Mẫu số bằng 0 được ghi là không phát sinh, không tính tỷ lệ. Tỷ suất cần hệ số khác 100 và các phương pháp khác chưa được hỗ trợ.
+- Tổng hợp quý hoặc năm chỉ hiện số khi đã ghi trạng thái cho tất cả các tháng trong kỳ. Tỷ lệ gộp tử số và mẫu số rồi nhân 100; chỉ số trên mẫu số giữ nguyên đơn vị; cộng dồn cộng giá trị tháng; giá trị gần nhất lấy tháng có số liệu cuối cùng trong kỳ. Mẫu số bằng 0 được ghi là không phát sinh, không tính kết quả.
 - Các số liệu trên trang chưa được xác nhận, khóa kỳ, tự động chấm điểm, tính trọng số hay xếp hạng. Những quy tắc này cần được bệnh viện phê duyệt trước khi triển khai.
-- Cần cập nhật lại Firestore Rules từ `firestore.rules` và kiểm thử quyền sau khi thêm chức năng này; việc tải tệp lên GitHub không tự công bố quy tắc.
+- Sau thay đổi, cập nhật Firestore Rules từ `firestore.rules` và kiểm thử quyền, bao gồm tiêu chí chênh lệch thu–chi có thể âm; tải tệp lên GitHub không tự công bố quy tắc.
 
 ## 📊 Thang điểm
 
