@@ -6,6 +6,7 @@ import EvaluationSystem from './components/EvaluationSystem'
 import Timeline from './components/Timeline'
 import Dashboard from './components/Dashboard'
 import FAQ from './components/FAQ'
+import SharedData from './components/SharedData'
 import Footer from './components/Footer'
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
       {currentPage === 'timeline' && <Timeline />}
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'faq' && <FAQ />}
+      {currentPage === 'data' && <SharedData />}
 
       <Footer />
     </div>
