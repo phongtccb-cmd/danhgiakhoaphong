@@ -12,9 +12,8 @@ const domains = {
   finance: 'Tài chính – kinh tế',
   staff: 'Nhân sự, đào tạo và nghiên cứu',
   safety: 'An toàn và môi trường',
-  specific: 'Chỉ tiêu riêng',
 }
-const methods = { ratio: 'Gộp tử số/mẫu số (hiển thị %)', sum: 'Cộng dồn', last: 'Giá trị gần nhất trong kỳ' }
+const methods = { ratio: 'Tỷ lệ (tử số/mẫu số × 100%)', rate: 'Số liệu trên một đơn vị mẫu số', sum: 'Cộng dồn', last: 'Giá trị gần nhất trong kỳ' }
 const statuses = {
   collected: 'Đã nhập số liệu',
   missing: 'Thiếu dữ liệu',
@@ -27,7 +26,7 @@ const groups = {
   paraclinical: 'Khoa cận lâm sàng',
 }
 const groupTargets = { functional: 11, clinical: 31, paraclinical: 7 }
-const domainWeights = { management: 18, quality: 23, finance: 19, staff: 16, safety: 19, specific: 5 }
+const domainWeights = { management: 19, quality: 24, finance: 20, staff: 17, safety: 20 }
 
 function useMonitoringData() {
   const [data, setData] = useState({ units: [], monitorIndicators: [], monitorAssignments: [], monthlyRecords: [] })
@@ -174,10 +173,12 @@ function MonthlyForm({ unitId, indicator, year, records, mayEdit }) {
       setMessage('Chọn đơn vị, chỉ tiêu và năm từ 2000 đến 2100.')
       return
     }
-    if (status === 'collected' && (indicator.method === 'ratio'
+    if (status === 'collected' && (indicator.method === 'ratio' || indicator.method === 'rate'
       ? !Number.isFinite(num) || num < 0 || !Number.isFinite(den) || den <= 0
-      : !Number.isFinite(number) || number < 0)) {
-      setMessage('Nhập số không âm; mẫu số của tỷ lệ phải lớn hơn 0.')
+      : !Number.isFinite(number) || (!indicator.allowNegative && number < 0))) {
+      setMessage(indicator.allowNegative
+        ? 'Nhập số liệu dạng số hợp lệ; mẫu số của tỷ lệ phải lớn hơn 0.'
+        : 'Nhập số không âm; mẫu số của tỷ lệ phải lớn hơn 0.')
       return
     }
     if (evidenceUrl && !/^https?:\/\/\S+$/i.test(evidenceUrl)) {
@@ -197,9 +198,9 @@ function MonthlyForm({ unitId, indicator, year, records, mayEdit }) {
         }
         transaction.set(ref, {
           unitId, indicatorId: indicator.id, year, month, status,
-          numerator: status === 'collected' && indicator.method === 'ratio' ? num : null,
-          denominator: status === 'collected' && indicator.method === 'ratio' ? den : null,
-          value: status === 'collected' && indicator.method !== 'ratio' ? number : null,
+          numerator: status === 'collected' && ['ratio', 'rate'].includes(indicator.method) ? num : null,
+          denominator: status === 'collected' && ['ratio', 'rate'].includes(indicator.method) ? den : null,
+          value: status === 'collected' && !['ratio', 'rate'].includes(indicator.method) ? number : null,
           evidenceUrl: evidenceUrl.trim(), note: note.trim(), updatedAt: serverTimestamp(),
         })
       })
@@ -224,7 +225,7 @@ function MonthlyForm({ unitId, indicator, year, records, mayEdit }) {
       <label>Trạng thái<select value={status} onChange={update(setStatus)}>
         {Object.entries(statuses).map(([key, text]) => <option key={key} value={key}>{text}</option>)}
       </select></label>
-      {status === 'collected' && (indicator.method === 'ratio' ? <>
+      {status === 'collected' && (indicator.method === 'ratio' || indicator.method === 'rate' ? <>
         <label>Tử số<input type="number" step="any" min="0" value={numerator} onChange={update(setNumerator)} required /></label>
         <label>Mẫu số<input type="number" step="any" min="0" value={denominator} onChange={update(setDenominator)} required /></label>
       </> : <label>Giá trị<input type="number" step="any" min="0" value={value} onChange={update(setValue)} required /></label>)}
@@ -245,6 +246,7 @@ function formatSummary(summary, method) {
     : 'Không phát sinh số liệu'
   const value = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(summary.value)
   if (method === 'ratio') return `${summary.numerator}/${summary.denominator} = ${value}%`
+  if (method === 'rate') return `${summary.numerator}/${summary.denominator} = ${value}`
   if (method === 'last') return `${value} (tháng ${summary.month})`
   return value
 }
@@ -299,7 +301,7 @@ export default function MonthlyTracker() {
   const validYear = /^(20\d{2}|2100)$/.test(year)
   const months = period === 'year' ? Array.from({ length: 12 }, (_, index) => index + 1)
     : Array.from({ length: 3 }, (_, index) => (Number(period) - 1) * 3 + index + 1)
-  const summary = indicator ? summarizeMonths(records.map(item => ({ ...item, month: Number(item.month) })), months, indicator.method) : null
+  const summary = indicator ? summarizeMonths(records.map(item => ({ ...item, month: Number(item.month) })), months, indicator.method, indicator.allowNegative) : null
   const mayEdit = user && (user.uid === ADMIN_UID || unitIds.includes(unitId))
   const selectedUnit = data.units.find(item => item.id === unitId)
   const ungroupedUnits = data.units.filter(item => !Object.hasOwn(groups, item.group))
@@ -332,7 +334,7 @@ export default function MonthlyTracker() {
             <div className="shared-card">
               <h3>Danh sách khoa phòng</h3>
               <p>Danh mục Firebase: {data.units.length}/49 đơn vị. Mục tiêu theo nhóm: 11, 31 và 7; số lượng chưa xác nhận tính chính xác của danh sách.</p>
-              <p>Chọn tên đơn vị để xem chi tiết. Dấu “—” nghĩa là chưa có quy định chấm điểm, không phải 0 điểm. Trên điện thoại, cuộn ngang bảng để xem đủ 6 khía cạnh.</p>
+              <p>Chọn tên đơn vị để xem chi tiết. Dấu “—” nghĩa là chưa có quy định chấm điểm, không phải 0 điểm. Trên điện thoại, cuộn ngang bảng để xem đủ 5 lĩnh vực.</p>
             </div>
             {Object.entries(groups).map(([key, title]) => (
               <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} />
@@ -375,7 +377,7 @@ export default function MonthlyTracker() {
             {indicators.length === 0 ? <p>Chưa có chỉ tiêu được gán cho đơn vị.</p> : <div className="score-list">
               {indicators.map(item => {
                 const indicatorRecords = data.monthlyRecords.filter(record => record.unitId === unitId && record.indicatorId === item.id && record.year === year)
-                const result = summarizeMonths(indicatorRecords.map(record => ({ ...record, month: Number(record.month) })), months, item.method)
+                const result = summarizeMonths(indicatorRecords.map(record => ({ ...record, month: Number(record.month) })), months, item.method, item.allowNegative)
                 return <div className="score-item" key={item.id}>
                   <strong>{item.name}</strong>
                   <span>{domains[item.domain] || 'Chưa xác định lĩnh vực'} · {methods[item.method] || 'Phương pháp không hợp lệ'}</span>
@@ -394,7 +396,7 @@ export default function MonthlyTracker() {
                 const item = records.find(record => Number(record.month) === month)
                 return <div key={month} className="score-item">
                   <strong>Tháng {month}: {item ? statuses[item.status] : 'Chưa nhập — thiếu dữ liệu'}</strong>
-                  {item?.status === 'collected' && <span>{indicator.method === 'ratio' ? `${item.numerator}/${item.denominator}` : item.value}</span>}
+                  {item?.status === 'collected' && <span>{['ratio', 'rate'].includes(indicator.method) ? `${item.numerator}/${item.denominator}` : item.value}</span>}
                   {item?.note && <span>{item.note}</span>}
                   {item?.evidenceUrl && /^https?:\/\/\S+$/i.test(item.evidenceUrl) && <a href={item.evidenceUrl} target="_blank" rel="noopener noreferrer">Xem minh chứng</a>}
                 </div>

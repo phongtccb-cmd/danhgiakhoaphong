@@ -123,6 +123,62 @@ body.dark-mode .shared-card {
   overflow-wrap: anywhere;
 }
 
+.criteria-domain-summary,
+.unit-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 0.75rem;
+}
+
+.unit-group-area > p {
+  margin-bottom: 0.75rem;
+}
+
+.shared-card .unit-picker-button {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #1f2937;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+body.dark-mode .shared-card .unit-picker-button {
+  border-color: #4b5563;
+  background: #111827;
+  color: #f9fafb;
+}
+
+.criterion-detail {
+  display: grid;
+  gap: 1rem;
+}
+
+.criterion-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.criterion-entry p {
+  margin-bottom: 0.5rem;
+}
+
+.criterion-edit summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.month-controls {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  margin: 1rem 0;
+}
+
 .monitoring-table-scroll {
   max-width: 100%;
   overflow-x: auto;

@@ -8,13 +8,13 @@ export default function FAQ() {
   const faqItems = [
     {
       id: 1,
-      question: 'Tại sao cần 6 lĩnh vực, không phải 4 (như Balanced Scorecard)?',
-      answer: 'Khung đề xuất điều chỉnh Balanced Scorecard theo bối cảnh bệnh viện: 5 lĩnh vực chung chiếm 95% và chỉ tiêu riêng chiếm 5%. An toàn người bệnh và môi trường y tế được bố trí 19%; đây là trọng số đề xuất, không phải tỷ lệ bắt buộc của WHO hay nghiên cứu Amer.'
+      question: 'Trọng số của 5 lĩnh vực được phân bổ thế nào?',
+      answer: 'Theo bộ tiêu chí đang rà soát: Quản lý 19%, Chất lượng 24%, Tài chính 20%, Nhân sự 17%, An toàn 20%, tổng 100%. Đây là trọng số đề xuất của bệnh viện, không phải tỷ lệ bắt buộc của WHO hay nghiên cứu Amer.'
     },
     {
       id: 2,
       question: 'Khoa ngoài sẽ luôn xếp cao hơn khoa nội vì doanh thu?',
-      answer: 'Cần so sánh trong các nhóm có chức năng tương đồng. Lĩnh vực tài chính 19% sử dụng chỉ tiêu phù hợp từng đơn vị: phòng hành chính không bị áp doanh thu hoặc lợi nhuận. Chất lượng và an toàn chiếm tổng cộng 42%; chỉ tiêu và cách chấm cần được công bố trước.'
+      answer: 'Cần so sánh trong các nhóm có chức năng tương đồng. Lĩnh vực tài chính 20% sử dụng chỉ tiêu phù hợp từng đơn vị: phòng hành chính không bị áp doanh thu hoặc lợi nhuận. Chất lượng và an toàn chiếm tổng cộng 44%; chỉ tiêu và cách chấm cần được công bố trước.'
     },
     {
       id: 3,
