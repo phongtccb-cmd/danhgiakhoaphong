@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function admin() {
+      return request.auth != null && request.auth.uid == 'SqJkboauioaobP2zqNtJMhb0SkB3';
+    }
+
+    function canEditUnit(unitId) {
+      return admin() || (request.auth != null
+        && exists(/databases/$(database)/documents/access/$(request.auth.uid))
+        && unitId in get(/databases/$(database)/documents/access/$(request.auth.uid)).data.unitIds);
+    }
+
+    function validName(data) {
+      return data.keys().hasOnly(['name'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200;
+    }
+
+    match /periods/{id} {
+      allow read: if true;
+      allow create, update: if admin() && id.matches('^[A-Za-z0-9]{20}$') && validName(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /indicators/{id} {
+      allow read: if true;
+      allow create, update: if admin() && id.matches('^[A-Za-z0-9]{20}$') && validName(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /units/{id} {
+      allow read: if true;
+      allow create, update: if admin()
+        && id.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.keys().hasOnly(['name', 'group'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
+        && request.resource.data.group in ['functional', 'clinical', 'paraclinical'];
+      allow delete: if false;
+    }
+
+    match /access/{uid} {
+      allow read: if admin() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if admin()
+        && request.resource.data.keys().hasOnly(['unitIds'])
+        && request.resource.data.unitIds is list
+        && request.resource.data.unitIds.size() <= 49;
+      allow delete: if admin();
+    }
+
+    match /scores/{id} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly([
+          'periodId', 'unitId', 'indicatorId', 'value', 'evidenceUrl', 'note', 'updatedAt'
+        ])
+        && request.resource.data.periodId is string
+        && request.resource.data.unitId is string
+        && request.resource.data.indicatorId is string
+        && request.resource.data.periodId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.unitId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.indicatorId.matches('^[A-Za-z0-9]{20}$')
+        && id == request.resource.data.periodId + '_' + request.resource.data.unitId + '_' + request.resource.data.indicatorId
+        && exists(/databases/$(database)/documents/periods/$(request.resource.data.periodId))
+        && exists(/databases/$(database)/documents/units/$(request.resource.data.unitId))
+        && exists(/databases/$(database)/documents/indicators/$(request.resource.data.indicatorId))
+        && canEditUnit(request.resource.data.unitId)
+        && request.resource.data.value is number
+        && request.resource.data.value >= 0 && request.resource.data.value <= 100
+        && request.resource.data.evidenceUrl is string
+        && request.resource.data.evidenceUrl.size() <= 2048
+        && (request.resource.data.evidenceUrl == '' || request.resource.data.evidenceUrl.matches('^https?://[^\\s]+$'))
+        && request.resource.data.note is string && request.resource.data.note.size() <= 2000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+  }
+}

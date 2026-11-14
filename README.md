@@ -4,17 +4,21 @@ Bệnh viện Đa khoa Thủ Đức - Hạng I trực thuộc Sở Y tế TP.HCM
 
 ## 📋 Giới thiệu
 
-Hệ thống toàn diện để đánh giá hoạt động của 44 khoa phòng dựa trên:
+Hệ thống đánh giá hoạt động của 49 phòng, khoa và cơ sở thuộc 3 nhóm:
+- 10 phòng chức năng và khoa Dược: 11 đơn vị
+- 29 khoa lâm sàng và 2 cơ sở: 31 đơn vị
+- 7 khoa cận lâm sàng (không tính khoa Dược)
+
+Khung đánh giá gồm:
 - **6 lĩnh vực chính** (Quản lý, Chất lượng, Tài chính, Nhân sự, An toàn, Chỉ tiêu riêng)
-- **36+ chỉ tiêu cụ thể** (đo lường được từ dữ liệu thực tế)
-- **Tiêu chuẩn quốc tế** (WHO, JCI, ISO)
+- Tham khảo dữ liệu, tài liệu WHO và điều chỉnh theo báo cáo, tình hình thực tế tại bệnh viện
 - **Công bằng, khách quan, minh bạch**
 
 ## 🎯 Mục tiêu
 
 - Đánh giá hoạt động định kỳ (quý/năm)
-- Phân nhóm 20% xuất sắc, 30% tốt, 50% bình thường
-- Tuân thủ tiêu chuẩn quốc tế
+- Mục tiêu phân nhóm 20% xuất sắc, 30% tốt, 50% còn lại; quy tắc áp dụng cần được phê duyệt
+- Tham khảo tài liệu quốc tế phù hợp với thực tế bệnh viện
 - Chuẩn bị triển khai năm 2027
 
 ## 📁 Cấu trúc Dự án
@@ -25,10 +29,8 @@ danhgiakhoaphong/
 │   ├── components/          # React components
 │   │   ├── Header.jsx
 │   │   ├── Navigation.jsx
-│   │   ├── Hero.jsx
 │   │   ├── Overview.jsx
 │   │   ├── EvaluationSystem.jsx
-│   │   ├── ComparisonPlans.jsx
 │   │   ├── Timeline.jsx
 │   │   ├── Dashboard.jsx
 │   │   ├── FAQ.jsx
@@ -69,32 +71,29 @@ npm run build
 3. Build command: `npm run build`
 4. Build output: `dist`
 
-## 📊 Lịch trình 3 Tuần
+## Dữ liệu dùng chung với Firebase
 
-### Tuần 1 (13-17.11.2026)
-- 13.11: Đọc tài liệu, chuẩn bị email
-- 13.11: BGĐ phê duyệt & gửi FORM_01, FORM_02
-- 17.11: Hạn chót FORM_01 từ 5 phòng chức năng
+- Dữ liệu kỳ đánh giá, đơn vị, chỉ tiêu, điểm, ghi chú và liên kết minh chứng **công khai trên Internet**. Không nhập dữ liệu nhạy cảm hoặc liên kết chứa thông tin riêng tư.
+- Trước khi đưa chức năng lên website, mở Firestore Database → Rules, thay nội dung bằng tệp `firestore.rules` của dự án và bấm **Publish**. Chỉ đưa dữ liệu thật vào sau khi kiểm tra quy tắc đã được áp dụng. Quyền xem/sửa được thực thi tại Firestore, không chỉ ẩn nút trên giao diện.
+- Bật Email/Password trong Firebase Authentication → Sign-in method. Thêm tên miền website vào Authentication → Settings → Authorized domains nếu chưa có.
+- Quản trị viên ban đầu là UID được cấu hình trong `src/firebase.js` và `firestore.rules`; hai giá trị phải khớp. Không chia sẻ mật khẩu hoặc khóa dịch vụ.
+- Tạo tài khoản Email/Password trong Firebase Authentication → Users. Trong website → Dữ liệu đánh giá, quản trị viên nhập UID và chọn đơn vị được phép sửa; danh sách trống thu hồi quyền sửa.
+- Quản trị viên thêm hoặc sửa kỳ đánh giá, danh sách đơn vị và chỉ tiêu. Danh mục khởi đầu trống cho đến khi có dữ liệu chính thức.
+- Người được cấp quyền nhập điểm chỉ tiêu tạm thời theo thang 0–100 và liên kết `http`/`https` cho đơn vị được giao; người chưa đăng nhập chỉ xem dữ liệu công khai. Chức năng chưa tự tính điểm tổng hay xếp loại. Liên kết minh chứng cần có quyền truy cập phù hợp và không chứa dữ liệu nhạy cảm.
+- Tài khoản được tạo trong Firebase Console, không tạo từ website. Chức năng không tải tệp minh chứng và không tự xóa dữ liệu.
 
-### Tuần 2 (18-24.11.2026)
-- 19.11 09:00: Kiểm email FORM_02 từ 5 BV
-- 20.11 12:00: ⭐ QUYẾT ĐỊNH A hay B
-- 20-23.11: Tính toán & QC
+## 📊 Thang điểm
 
-### Tuần 3 (25-30.11.2026)
-- 24.11: Rehearsal & In tài liệu
-- 27.11 08:00: 🎯 TRÌNH BGĐ
-- 28.11: Công bố kết quả
+| Điểm | Mức đánh giá |
+|---|---|
+| 90–100 | Xuất sắc |
+| 85–dưới 90 | Rất tốt |
+| 75–dưới 85 | Khá tốt |
+| 50–dưới 75 | Hoàn thành |
+| Dưới 50 | Chưa hoàn thành |
 
-## 🔄 PLAN A vs PLAN B
-
-| Tiêu chí | PLAN A | PLAN B |
-|----------|--------|--------|
-| Phương pháp | Benchmarking (5 BV) | WHO Standards |
-| Phụ thuộc | Email từ 5 BV | Không phụ thuộc |
-| Trigger | ≥3 BV trả lời | <3 BV hoặc chọn chủ động |
-| An toàn % | 10-15% | 20% (WHO) |
-| Độc lập | Thấp | Cao (100%) |
+Điểm lẻ được xét theo khoảng liên tục. Ngưỡng điểm không tự bảo đảm tỷ lệ phân nhóm.
+Trọng số và ngưỡng là đề xuất của bệnh viện, không phải tỷ lệ do WHO quy định.
 
 ## 📞 Liên hệ
 
