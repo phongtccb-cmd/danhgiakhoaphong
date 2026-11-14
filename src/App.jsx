@@ -13,7 +13,6 @@ import Footer from './components/Footer'
 function App() {
   const [darkMode, setDarkMode] = useState(false)
   const [currentPage, setCurrentPage] = useState('home')
-  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const isDark = localStorage.getItem('darkMode') === 'true'
@@ -34,10 +33,8 @@ function App() {
       
       {currentPage === 'home' && (
         <>
-          <Hero />
+          <Hero setCurrentPage={setCurrentPage} />
           <Overview />
-          <EvaluationSystem />
-          <ComparisonPlans />
         </>
       )}
 
