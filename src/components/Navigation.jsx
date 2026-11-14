@@ -4,7 +4,7 @@ export default function Navigation({ currentPage, setCurrentPage }) {
   const navItems = [
     { id: 'home', label: 'Trang chủ', icon: '🏠' },
     { id: 'system', label: 'Hệ thống đánh giá', icon: '📊' },
-    { id: 'comparison', label: 'So sánh PLAN A/B', icon: '⚖️' },
+    { id: 'comparison', label: 'Phương án B', icon: '⚖️' },
     { id: 'timeline', label: 'Lịch trình', icon: '📅' },
     { id: 'dashboard', label: 'Dashboard', icon: '📈' },
     { id: 'faq', label: 'Câu hỏi thường gặp', icon: '❓' },
@@ -18,6 +18,7 @@ export default function Navigation({ currentPage, setCurrentPage }) {
             <button
               key={item.id}
               className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
+              aria-current={currentPage === item.id ? 'page' : undefined}
               onClick={() => setCurrentPage(item.id)}
             >
               <span className="nav-icon">{item.icon}</span>

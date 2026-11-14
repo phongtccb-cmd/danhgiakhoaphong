@@ -5,158 +5,31 @@ export default function ComparisonPlans() {
     <section className="comparison-plans section">
       <div className="container">
         <div className="section-title">
-          <h2>So sánh PLAN A & PLAN B</h2>
-          <p>Hai phương án thực hiện với ưu nhược điểm riêng</p>
+          <h2>Phương án B đã chọn</h2>
+          <p>Tham khảo dữ liệu, tài liệu WHO và điều chỉnh theo báo cáo, tình hình thực tế tại bệnh viện.</p>
         </div>
-
-        <div className="plans-container">
-          {/* PLAN A */}
-          <div className="plan plan-a">
-            <div className="plan-header">
-              <h3>PLAN A: Benchmarking</h3>
-              <span className="plan-badge">Tham khảo BV khác</span>
-            </div>
-            <div className="plan-content">
-              <div className="plan-section">
-                <h4>Phương pháp</h4>
-                <p>Lấy trọng số từ 5 bệnh viện tương đồng (gửi FORM_02)</p>
-              </div>
-              <div className="plan-section">
-                <h4>⏱️ Lịch trình</h4>
-                <ul>
-                  <li>T1 (13-17.11): Gửi FORM_01 & FORM_02</li>
-                  <li>T2 (19-20.11): Kiểm email, phân tích dữ liệu</li>
-                  <li>T3 (21-27.11): Tính toán, trình BGĐ</li>
-                </ul>
-              </div>
-              <div className="plan-section">
-                <h4>✅ Ưu điểm</h4>
-                <ul>
-                  <li>Dựa trên dữ liệu thực tế từ BV khác</li>
-                  <li>Thích ứng với bối cảnh BV công lập VN</li>
-                  <li>Dễ thuyết phục khoa phòng</li>
-                </ul>
-              </div>
-              <div className="plan-section">
-                <h4>⚠️ Hạn chế</h4>
-                <ul>
-                  <li>Phụ thuộc vào email từ 5 BV (có thể chậm)</li>
-                  <li>Dữ liệu có thể không đầy đủ hoặc không chính xác</li>
-                  <li>Nếu &lt;3 BV trả lời → phải chuyển sang PLAN B</li>
-                </ul>
-              </div>
-              <div className="plan-section">
-                <h4>📊 Trigger</h4>
-                <p><strong>≥3 BV trả lời FORM_02</strong> → Dùng PLAN A</p>
-              </div>
-            </div>
+        <div className="plan plan-b">
+          <div className="plan-header">
+            <h3>Cách thực hiện</h3>
+            <span className="plan-badge">WHO + dữ liệu bệnh viện</span>
           </div>
-
-          {/* PLAN B */}
-          <div className="plan plan-b">
-            <div className="plan-header">
-              <h3>PLAN B: Tham khảo quốc tế</h3>
-              <span className="plan-badge">Tiêu chuẩn quốc tế</span>
+          <div className="plan-content">
+            <div className="plan-section">
+              <h4>1. Xác định nguồn tham khảo</h4>
+              <p>Chọn chỉ số và tài liệu WHO phù hợp; ghi rõ nguồn, năm, định nghĩa và điều kiện so sánh.</p>
             </div>
-            <div className="plan-content">
-              <div className="plan-section">
-                <h4>Phương pháp</h4>
-                <p>Tham khảo tài liệu quốc tế và điều chỉnh theo dữ liệu nội bộ bệnh viện.</p>
-              </div>
-              <div className="plan-section">
-                <h4>⏱️ Lịch trình</h4>
-                <ul>
-                  <li>T1 (13-17.11): Sẵn sàng, không phụ thuộc ai</li>
-                  <li>T2 (20-23.11): Tính toán (dựa PLAN_B template)</li>
-                  <li>T3 (24-27.11): Trình BGĐ</li>
-                </ul>
-              </div>
-              <div className="plan-section">
-                <h4>✅ Ưu điểm</h4>
-                <ul>
-                  <li>Không phụ thuộc vào ai, tự chủ hoàn toàn</li>
-                  <li>Tham khảo các tài liệu quốc tế (WHO, JCI)</li>
-                  <li>Trọng số an toàn đề xuất là 19%, cần được bệnh viện xem xét</li>
-                </ul>
-              </div>
-              <div className="plan-section">
-                <h4>⚠️ Hạn chế</h4>
-                <ul>
-                  <li>WHO tiêu chuẩn quốc tế → Có thể không 100% phù hợp BV VN</li>
-                  <li>Cần giải thích cho BGĐ & khoa phòng</li>
-                </ul>
-              </div>
-              <div className="plan-section">
-                <h4>📊 Trigger</h4>
-                <p><strong>&lt;3 BV trả lời FORM_02</strong> → Dùng PLAN B (hoặc chọn chủ động)</p>
-              </div>
+            <div className="plan-section">
+              <h4>2. Thu thập dữ liệu bệnh viện</h4>
+              <p>Đối chiếu báo cáo và dữ liệu nội bộ theo kỳ đánh giá, nhóm đơn vị và trách nhiệm của từng khoa, phòng.</p>
             </div>
-          </div>
-        </div>
-
-        <div className="comparison-matrix">
-          <h3>Ma trận chi tiết so sánh</h3>
-          <table className="comparison-table">
-            <thead>
-              <tr>
-                <th>Tiêu chí</th>
-                <th>PLAN A (Benchmarking)</th>
-                <th>PLAN B (Tham khảo quốc tế)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Căn cứ</strong></td>
-                <td>Dữ liệu từ 5 BV tương đồng</td>
-                <td>Tham khảo WHO, JCI, ISO và dữ liệu nội bộ</td>
-              </tr>
-              <tr>
-                <td><strong>Phụ thuộc</strong></td>
-                <td>Email từ 5 BV</td>
-                <td>Không phụ thuộc</td>
-              </tr>
-              <tr>
-                <td><strong>Lịch trình</strong></td>
-                <td>27 ngày (chờ email)</td>
-                <td>21 ngày (nhanh hơn)</td>
-              </tr>
-              <tr>
-                <td><strong>An toàn %</strong></td>
-                <td>10-15% (chờ BV)</td>
-                <td>19% (đề xuất, không phải chuẩn WHO)</td>
-              </tr>
-              <tr>
-                <td><strong>Độc lập</strong></td>
-                <td>Thấp (phụ FORM_02)</td>
-                <td>Cao (tự chủ 100%)</td>
-              </tr>
-              <tr>
-                <td><strong>Uy tín</strong></td>
-                <td>Dựa dữ liệu BV VN</td>
-                <td>Dựa tiêu chuẩn quốc tế</td>
-              </tr>
-              <tr>
-                <td><strong>BGĐ thuyết phục</strong></td>
-                <td>Vừa phải</td>
-                <td>Cao (WHO = uy tín)</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="decision-timeline">
-          <h3>🎯 Trigger Decision Timeline</h3>
-          <div className="timeline-item trigger-active">
-            <span className="timeline-date">19.11 09:00</span>
-            <span className="timeline-event">Kiểm email FORM_02</span>
-          </div>
-          <div className="timeline-item trigger-decision">
-            <span className="timeline-date">20.11 12:00</span>
-            <span className="timeline-event"><strong>⚠️ QUYẾT ĐỊNH A hay B</strong></span>
-          </div>
-          <div className="timeline-info">
-            <p>✅ ≥3 BV → PLAN A (Benchmarking)</p>
-            <p>❌ &lt;3 BV → PLAN B (tham khảo quốc tế)</p>
+            <div className="plan-section">
+              <h4>3. Điều chỉnh và trình duyệt</h4>
+              <p>Rà soát tính phù hợp, công thức, khả năng thu thập và trọng số; công bố tiêu chí trước khi áp dụng.</p>
+            </div>
+            <div className="plan-section">
+              <h4>Lưu ý</h4>
+              <p>Dữ liệu WHO chỉ là căn cứ tham khảo, không mặc nhiên tương đương dữ liệu bệnh viện. Các trọng số và ngưỡng đánh giá là đề xuất của bệnh viện, không phải chuẩn do WHO ấn định.</p>
+            </div>
           </div>
         </div>
       </div>

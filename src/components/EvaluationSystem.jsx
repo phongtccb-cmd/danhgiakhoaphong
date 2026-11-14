@@ -72,7 +72,7 @@ export default function EvaluationSystem() {
           <p>Các ví dụ cần được lựa chọn và phê duyệt theo chức năng, nguồn dữ liệu và trách nhiệm của từng đơn vị.</p>
           <div className="specific-indicators-grid">
             <div>
-              <h4>Lâm sàng</h4>
+              <h4>Khoa lâm sàng & cơ sở</h4>
               <ul>
                 <li>Triển khai kỹ thuật mới, kỹ thuật chuyên sâu.</li>
                 <li>Chuyển tuyến trên không phù hợp; phẫu thuật đúng giờ với khoa có phẫu thuật.</li>
@@ -83,16 +83,17 @@ export default function EvaluationSystem() {
               <h4>Cận lâm sàng</h4>
               <ul>
                 <li>Trả kết quả xét nghiệm hoặc chẩn đoán hình ảnh cấp cứu đúng thời hạn.</li>
-                <li>Đứt gãy thuốc, hóa chất, vật tư; sai sót cấp phát thuốc của khoa Dược.</li>
+                <li>Đứt gãy hóa chất và vật tư phục vụ chuyên môn.</li>
                 <li>Kết quả ngoại kiểm chất lượng xét nghiệm theo yêu cầu áp dụng.</li>
               </ul>
             </div>
             <div>
-              <h4>Phòng chức năng</h4>
+              <h4>Phòng chức năng & khoa Dược</h4>
               <ul>
                 <li>KHTH/QLCL: hoàn thành đề án cải tiến, theo dõi kết quả đánh giá chất lượng.</li>
                 <li>Vật tư - thiết bị y tế: khắc phục sự cố và bảo trì đúng hạn.</li>
                 <li>Tài chính - kế toán: thu hồi công nợ BHYT và chi trả đúng hạn theo trách nhiệm.</li>
+                <li>Khoa Dược: đứt gãy thuốc và sai sót cấp phát thuốc.</li>
               </ul>
             </div>
           </div>
@@ -146,46 +147,35 @@ export default function EvaluationSystem() {
         </div>
 
         <div className="scoring-table">
-          <h3>Thang điểm & Phân loại tham khảo</h3>
-          <p>Ngưỡng điểm và cách áp dụng tỷ lệ cần được phê duyệt; ngưỡng cố định không tự bảo đảm tỷ lệ xếp nhóm.</p>
+          <h3>Thang điểm & Phân loại</h3>
+          <p>Điểm lẻ được xếp theo khoảng liên tục. Mục tiêu tỷ lệ 20% – 30% – 50% cần có quy định xếp hạng riêng; các ngưỡng điểm không tự bảo đảm tỷ lệ này.</p>
           <table>
             <thead>
               <tr>
-                <th>Nhóm</th>
-                <th>Tên gọi</th>
+                <th>Mức đánh giá</th>
                 <th>Điểm số</th>
-                <th>Tỷ lệ</th>
-                <th>Mô tả</th>
               </tr>
             </thead>
             <tbody>
               <tr className="group-a">
-                <td><span className="group-badge">A</span></td>
                 <td><strong>Xuất sắc</strong></td>
-                <td>90-100</td>
-                <td>20%</td>
-                <td>Hoàn thành xuất sắc, vượt chỉ tiêu</td>
+                <td>90–100</td>
               </tr>
               <tr className="group-b">
-                <td><span className="group-badge">B</span></td>
-                <td><strong>Tốt</strong></td>
-                <td>75-89</td>
-                <td>30%</td>
-                <td>Hoàn thành tốt, đạt chỉ tiêu</td>
+                <td><strong>Rất tốt</strong></td>
+                <td>85–dưới 90</td>
               </tr>
               <tr className="group-c">
-                <td><span className="group-badge">C</span></td>
-                <td><strong>Bình thường</strong></td>
-                <td>60-74</td>
-                <td>Trong 50% còn lại</td>
-                <td>Hoàn thành cơ bản, cần cải thiện</td>
+                <td><strong>Khá tốt</strong></td>
+                <td>75–dưới 85</td>
               </tr>
               <tr className="group-d">
-                <td><span className="group-badge">D</span></td>
-                <td><strong>Chưa đạt</strong></td>
-                <td>&lt;60</td>
-                <td>Trong 50% còn lại</td>
-                <td>Cần xử lý, hỗ trợ cụ thể</td>
+                <td><strong>Hoàn thành</strong></td>
+                <td>50–dưới 75</td>
+              </tr>
+              <tr>
+                <td><strong>Chưa hoàn thành</strong></td>
+                <td>Dưới 50</td>
               </tr>
             </tbody>
           </table>

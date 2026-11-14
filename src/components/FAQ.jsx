@@ -19,17 +19,17 @@ export default function FAQ() {
     {
       id: 3,
       question: 'Có thể sai lệch dữ liệu không?',
-      answer: 'Có quy trình kiểm chứng cụ thể (ngày 10-15 mỗi tháng). Nếu Khoa báo cáo sai → Kỷ luật Trưởng khoa (giảm điểm quản lý tổ chức) → Khoa sẽ không dám sai lần sau. Đây là cơ chế tự kiểm soát.'
+      answer: 'Cần đối chiếu báo cáo với nguồn dữ liệu gốc, phân công đầu mối kiểm chứng và cho đơn vị cơ hội giải trình trước khi xác nhận kết quả.'
     },
     {
       id: 4,
       question: 'Chi phí thực hiện bao nhiêu?',
-      answer: 'Lần đầu: <50 triệu (tự làm trong BV, không cần tư vấn ngoài). Từ năm 2 trở đi: <10 triệu/năm (tự động hóa). Lợi nhuận: Nếu tăng doanh thu 5% = 50 tỷ → ROI = 100 lần. Rất đáng đầu tư.'
+      answer: 'Chi phí cần được lập dự toán dựa trên phạm vi triển khai và nguồn lực thực tế của bệnh viện.'
     },
     {
       id: 5,
       question: 'Các khoa sẽ phàn nàn không?',
-      answer: 'Khó khăn. Vì hệ thống rõ ràng & công khai (công bố tiêu chí, công thức, kết quả). Khoa có thể kiểm tra lại số liệu. So với đánh giá chủ quan trước → Rất minh bạch. Nếu khoa phàn nàn, chúng ta có số liệu để bảo vệ.'
+      answer: 'Cần công bố tiêu chí, công thức và kết quả, đồng thời tiếp nhận phản hồi và giải trình của các khoa, phòng.'
     },
     {
       id: 6,
@@ -38,22 +38,22 @@ export default function FAQ() {
     },
     {
       id: 7,
-      question: 'PLAN A và PLAN B khác nhau như thế nào?',
-      answer: 'PLAN A tham khảo dữ liệu từ các bệnh viện tương đồng. PLAN B tham khảo các tài liệu quốc tế và điều chỉnh theo dữ liệu nội bộ; các tổ chức quốc tế không quy định sẵn bộ trọng số này. BGĐ xem xét lựa chọn phương án phù hợp.'
+      question: 'Bệnh viện sử dụng phương án nào?',
+      answer: 'Phương án B đã được lựa chọn: tham khảo dữ liệu, tài liệu WHO và điều chỉnh theo báo cáo, tình hình thực tế tại bệnh viện. WHO không quy định sẵn bộ trọng số này.'
     },
     {
       id: 8,
-      question: 'Khi nào xác định được PLAN A hay PLAN B?',
-      answer: '⭐ QUYẾT ĐỊNH CHÍNH: 20.11.2026 12:00 (Thứ 3 tuần 2). Vào sáng 19.11 09:00 (Thứ 2), chúng ta sẽ kiểm email từ 5 BV. Nếu ≥3 trả lời → PLAN A. Nếu <3 → PLAN B. BGĐ sẽ được báo cáo & quyết định.'
+      question: '49 đơn vị được chia thành những nhóm nào?',
+      answer: 'Ba nhóm gồm 10 phòng chức năng và khoa Dược (11); 29 khoa lâm sàng và 2 cơ sở (31); 7 khoa cận lâm sàng, không tính khoa Dược.'
     },
     {
       id: 9,
-      question: 'Nếu PLAN A được chọn, bước tiếp theo là gì?',
-      answer: 'Dùng TEMPLATE_03 (Phân tích & Điều chỉnh Trọng số) để phân tích dữ liệu từ 5 BV và FORM_01 của BV Thủ Đức. Tính toán trọng số mới dựa trên so sánh. Sau đó tính điểm cho 44 khoa.'
+      question: 'Các ngưỡng điểm có tự bảo đảm tỷ lệ 20% – 30% – 50% không?',
+      answer: 'Không. Ngưỡng điểm cố định và tỷ lệ phân nhóm là hai quy tắc khác nhau; cần quy định rõ cách xếp hạng và xử lý khi kết quả không khớp tỷ lệ.'
     },
     {
       id: 10,
-      question: 'Nếu PLAN B được chọn, bước tiếp theo là gì?',
+      question: 'Bước tiếp theo của phương án B là gì?',
       answer: 'Sử dụng dữ liệu nội bộ và tài liệu tham khảo để xây dựng phương án, sau đó rà soát chỉ tiêu, trọng số và cách tính với các đơn vị trước khi trình BGĐ.'
     },
   ]

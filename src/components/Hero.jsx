@@ -22,7 +22,7 @@ export default function Hero({ setCurrentPage }) {
             <ArrowRight size={20} />
           </button>
           <button className="btn-secondary btn-large" onClick={() => setCurrentPage('comparison')}>
-            <span>So sánh phương án</span>
+            <span>Phương án B</span>
           </button>
         </div>
       </div>
