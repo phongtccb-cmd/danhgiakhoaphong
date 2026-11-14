@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore'
 import { ADMIN_UID, auth, db } from '../firebase'
+import { normalizeUnitName, officialUnits, planUnitImport } from '../lib/officialUnits'
 import './SharedData.css'
 
 const groups = {
@@ -140,6 +141,73 @@ function MasterForm({ title, name, items, isUnit = false }) {
       <button disabled={busy} type="submit">{busy ? 'Đang lưu…' : 'Lưu'}</button>
       {message && <p role="status">{message}</p>}
     </form>
+  )
+}
+
+function UnitImport({ units }) {
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const preview = planUnitImport(units)
+
+  async function submit() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const snapshot = await getDocs(collection(db, 'units'))
+      const current = snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
+      const plan = planUnitImport(current)
+      if (plan.errors.length) throw new Error(plan.errors.join(' '))
+      if (!plan.missing.length) {
+        setMessage('Danh mục đã có đủ 49 đơn vị khớp tên và nhóm; không có dữ liệu cần thêm.')
+        return
+      }
+      let added = 0
+      await runTransaction(db, async transaction => {
+        const refs = plan.missing.map(unit => doc(db, 'units', unit.id))
+        const snapshots = await Promise.all(refs.map(ref => transaction.get(ref)))
+        const newUnits = []
+        snapshots.forEach((item, index) => {
+          const unit = plan.missing[index]
+          if (!item.exists()) newUnits.push({ ref: refs[index], unit })
+          else {
+            const value = item.data()
+            if (typeof value.name !== 'string' || normalizeUnitName(value.name) !== normalizeUnitName(unit.name) || value.group !== unit.group) {
+              throw new Error(`Mã của ${unit.name} đã được dùng cho đơn vị khác; dừng để kiểm tra.`)
+            }
+          }
+        })
+        newUnits.forEach(({ ref, unit }) => transaction.set(ref, { name: unit.name, group: unit.group }))
+        added = newUnits.length
+      })
+      setMessage(`Đã thêm ${added} đơn vị còn thiếu. Kiểm tra lại danh mục và phân quyền sau khi nhập.`)
+    } catch (err) {
+      setMessage(`Không thể nhập danh mục: ${err.message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <details className="shared-card">
+      <summary>Nhập danh sách 49 đơn vị từ Quyết định 949</summary>
+      <p>Đối chiếu 11 phòng chức năng và Dược, 31 khoa lâm sàng và cơ sở, 7 khoa cận lâm sàng. Khoa Truyền nhiễm tạm ghép Khoa Nội tổng hợp, không tạo đơn vị riêng.</p>
+      <p>Chỉ thêm đơn vị còn thiếu; không sửa, xóa hoặc thay mã đơn vị đã có. Đối chiếu tên và nhóm trước khi nhập, tránh thao tác nhập danh mục đồng thời ở nơi khác.</p>
+      <details>
+        <summary>Xem danh sách dự kiến</summary>
+        {Object.entries(groups).map(([group, title]) => <div key={group}>
+          <h4>{title}</h4>
+          <ul>{officialUnits.filter(unit => unit.group === group).map(unit => <li key={unit.id}>{unit.name}</li>)}</ul>
+        </div>)}
+      </details>
+      {preview.errors.length > 0 ? <div className="shared-error" role="alert">
+        <p>Danh mục hiện có cần được đối chiếu trước khi nhập:</p>
+        <ul>{preview.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>
+      </div> : <p>Còn thiếu {preview.missing.length}/49 đơn vị theo tên và nhóm.</p>}
+      <button type="button" disabled={busy || preview.errors.length > 0} onClick={submit}>
+        {busy ? 'Đang kiểm tra và nhập…' : 'Thêm các đơn vị còn thiếu'}
+      </button>
+      {message && <p role="status">{message}</p>}
+    </details>
   )
 }
 
@@ -340,6 +408,7 @@ export default function SharedData() {
         {isAdmin && (
           <div className="admin-area">
             <h3>Quản trị dữ liệu</h3>
+            {!dataLoading && !error && <UnitImport units={data.units} />}
             <div className="admin-grid">
               <MasterForm title="Kỳ đánh giá" name="periods" items={data.periods} />
               <MasterForm title="Đơn vị" name="units" items={data.units} isUnit />

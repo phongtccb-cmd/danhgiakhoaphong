@@ -3,6 +3,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { ADMIN_UID, auth, db } from '../firebase'
 import { summarizeMonths } from '../lib/monitoring'
+import { normalizeUnitName } from '../lib/officialUnits'
 import './SharedData.css'
 
 const domains = {
@@ -344,6 +345,8 @@ export default function MonthlyTracker() {
             <button type="button" onClick={() => { setUnitId(''); setIndicatorId('') }}>← Danh sách khoa phòng</button>
             <h3>{selectedUnit.name}</h3>
             <p>{groups[selectedUnit.group] || 'Chưa xác định nhóm'}</p>
+            {normalizeUnitName(selectedUnit.name) === normalizeUnitName('Khoa Nội tổng hợp') &&
+              <p>Khoa Truyền nhiễm chưa hình thành nhân sự, hiện ghép chung tại Khoa Nội tổng hợp; chưa là đơn vị đánh giá riêng.</p>}
             <p>Chưa có quy định quy đổi chỉ tiêu thành điểm, ngưỡng đạt hoặc điểm cộng/trừ. Không thể xác định đạt, chưa đạt hay điểm tổng.</p>
             <div className="monitoring-domain-grid">
               {Object.entries(domains).map(([key, text]) => <div className="score-item" key={key}>
