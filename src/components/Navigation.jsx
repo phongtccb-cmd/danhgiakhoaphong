@@ -6,6 +6,7 @@ export default function Navigation({ currentPage, setCurrentPage }) {
     { id: 'system', label: 'Hệ thống đánh giá', icon: '📊' },
     { id: 'timeline', label: 'Lịch trình', icon: '📅' },
     { id: 'dashboard', label: 'Dashboard', icon: '📈' },
+    { id: 'data', label: 'Dữ liệu đánh giá', icon: '📋' },
     { id: 'faq', label: 'Câu hỏi thường gặp', icon: '❓' },
   ]
 

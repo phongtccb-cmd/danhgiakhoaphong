@@ -1,0 +1,140 @@
+.shared-data {
+  background: #f9fafb;
+}
+
+body.dark-mode .shared-data {
+  background: #111827;
+}
+
+.shared-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+body.dark-mode .shared-card {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.shared-card h3,
+.shared-card h4 {
+  margin-bottom: 0.75rem;
+}
+
+.shared-card p:last-child {
+  margin-bottom: 0;
+}
+
+.admin-area {
+  margin: 1.5rem 0;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 1rem;
+}
+
+.admin-grid .shared-card {
+  margin-bottom: 0;
+}
+
+.shared-form,
+.login-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.shared-form label,
+.login-form label {
+  margin: 0;
+}
+
+.shared-form input,
+.shared-form select,
+.shared-form textarea,
+.login-form input {
+  margin-top: 0.25rem;
+}
+
+.shared-card button {
+  width: fit-content;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #0052a3;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shared-card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.account-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.shared-form fieldset {
+  padding: 0.75rem;
+  border: 1px solid #9ca3af;
+  border-radius: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0.5rem 0 !important;
+}
+
+.score-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.public-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 1rem;
+}
+
+.public-catalog ul {
+  padding-left: 1.25rem;
+}
+
+.score-item {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.shared-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+body.dark-mode .shared-error {
+  color: #fca5a5;
+}
+
+@media (min-width: 700px) {
+  .login-form {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: end;
+  }
+}
