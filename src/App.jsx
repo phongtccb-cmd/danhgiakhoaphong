@@ -4,7 +4,6 @@ import Navigation from './components/Navigation'
 import Overview from './components/Overview'
 import EvaluationSystem from './components/EvaluationSystem'
 import Timeline from './components/Timeline'
-import Dashboard from './components/Dashboard'
 import FAQ from './components/FAQ'
 import SharedData from './components/SharedData'
 import MonthlyTracker from './components/MonthlyTracker'
@@ -35,7 +34,6 @@ function App() {
 
       {currentPage === 'system' && <EvaluationSystem />}
       {currentPage === 'timeline' && <Timeline />}
-      {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'faq' && <FAQ />}
       {currentPage === 'data' && <SharedData />}
       {currentPage === 'monitor' && <MonthlyTracker />}
