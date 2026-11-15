@@ -81,20 +81,23 @@ npm run build
 - Quản trị viên có thể xem và nhập các đơn vị còn thiếu theo Quyết định 949 tại mục **Dữ liệu đánh giá**. Danh sách gồm 49 đơn vị; Khoa Truyền nhiễm tạm ghép Khoa Nội tổng hợp và không tạo đơn vị riêng. Việc nhập không tự chạy, không sửa hoặc xóa đơn vị có sẵn; tên khác, nhóm sai hoặc tên trùng phải được đối chiếu trước. Không nhập danh mục đồng thời từ nơi khác.
 - Sau khi đủ 49 đơn vị, quản trị viên dùng **Nạp tiêu chí và phân công theo CSV** để thêm bộ tiêu chí đo lường và gán theo nhóm. Tệp có 43 tiêu chí đo lường và 2 dòng điểm tham chiếu không nhập số liệu.
 - Tab **Dữ liệu đánh giá** chia 3 nhóm đơn vị; chọn đơn vị, tháng và năm để xem/cập nhật từng tiêu chí theo CSV. Tài khoản chỉ nhập cho đơn vị được cấp quyền.
-- Ngưỡng CSV là tham khảo và một số trường đo/ngưỡng còn thiếu hoặc cần rà soát. Hệ thống lưu số liệu tháng, không tự kết luận đạt/chưa đạt, cộng điểm hoặc xếp hạng. Liên kết minh chứng cần có quyền truy cập phù hợp và không chứa dữ liệu nhạy cảm.
+- Hệ thống đối chiếu ngưỡng số và chiều đạt rõ trong CSV để tính điểm tại tab Theo dõi định kỳ. Một số trường đo/ngưỡng còn thiếu hoặc cần rà soát; các tiêu chí đó chưa được chấm. Liên kết minh chứng cần có quyền truy cập phù hợp và không chứa dữ liệu nhạy cảm.
 - Tài khoản được tạo trong Firebase Console, không tạo từ website. Chức năng không tải tệp minh chứng và không tự xóa dữ liệu.
 
 ### Theo dõi tháng và tổng hợp kỳ
 
 - Bảng theo dõi lấy danh mục đơn vị từ Firebase và đối chiếu số lượng theo 3 nhóm (11/31/7); chưa đủ dữ liệu thì chỉ hiển thị những đơn vị đã có. Chọn tên đơn vị để xem các khía cạnh và số liệu chỉ tiêu đã gán.
-- Chọn tháng, quý hoặc năm ở tab **Theo dõi định kỳ** để xem số liệu đồng bộ từ **Dữ liệu đánh giá**. Bảng hiển thị số chỉ tiêu có kết quả số liệu trên tổng số chỉ tiêu đã gán cho từng lĩnh vực; đây không phải điểm.
-- Dấu “—”, tình trạng đạt/chưa đạt và điểm cộng/trừ chưa được tính khi chưa có quy định chấm điểm; không hiểu dữ liệu thiếu là 0 điểm.
+- Chọn tháng, quý hoặc năm ở tab **Theo dõi định kỳ** để xem điểm và số liệu đồng bộ từ **Dữ liệu đánh giá**.
+- Mỗi lĩnh vực có điểm tối đa bằng trọng số trên thang 100. Chia đều điểm tối đa cho các tiêu chí CSV của nhóm: đạt ngưỡng được đủ điểm tiêu chí, không đạt được 0. Tính toán không làm tròn từng tiêu chí, kết quả hiển thị tối đa hai chữ số thập phân.
+- Thiếu dữ liệu, chưa đến kỳ, không phát sinh, ngưỡng hoặc chiều đạt chưa rõ, cấu hình không khớp CSV đều chưa xác định; không coi là không đạt hay 0 điểm. Điểm lĩnh vực chưa đủ tiêu chí chỉ là tổng tạm tính của các tiêu chí đã xác định.
+- Khối phòng ban và Dược dùng điểm tham chiếu Tài chính và An toàn là trung bình cộng điểm cùng lĩnh vực của từng đơn vị lâm sàng, cận lâm sàng đã đủ điểm lĩnh vực. Khi chưa đủ 38 đơn vị, trung bình này là tạm tính và hiển thị số đơn vị đã đủ điểm.
+- Tỷ lệ chỉ nhập một ô theo CSV (giường nội trú, vệ sinh tay) nhập theo phần trăm: 80 tương ứng 80%, không nhập 0,8. Cần rà soát các số liệu đã nhập trước khi sử dụng điểm. Tỷ lệ có tử số và mẫu số tiếp tục nhập hai số liệu gốc.
 - Hai tab cùng sử dụng các bộ sưu tập theo dõi và số liệu tháng trong Firestore. Bộ tiêu chí CSV cần được quản trị viên nạp và gán trước; các chỉ tiêu cấu hình thủ công vẫn được giữ lại.
 - Định nghĩa theo dõi và việc gán hiện chỉ được tạo mới, không sửa/xóa trên giao diện. Không có hiệu lực theo ngày; phải rà soát trước khi tạo và không dùng để thay đổi phạm vi chỉ tiêu theo từng kỳ. Danh mục này tách khỏi danh mục điểm nhập thủ công hiện có.
 - Người được cấp quyền nhập dữ liệu tháng của đơn vị: số liệu, thiếu dữ liệu, chưa đến kỳ đo hoặc không phát sinh. Không gán chỉ tiêu cho đơn vị nghĩa là chưa cấu hình áp dụng, không phải điểm 0.
 - Tổng hợp quý hoặc năm chỉ hiện số khi đã ghi trạng thái cho tất cả các tháng trong kỳ. Tỷ lệ gộp tử số và mẫu số rồi nhân 100; chỉ số trên mẫu số giữ nguyên đơn vị; cộng dồn cộng giá trị tháng; giá trị gần nhất lấy tháng có số liệu cuối cùng trong kỳ. Mẫu số bằng 0 được ghi là không phát sinh, không tính kết quả.
 - Phương pháp tổng hợp cho tiêu chí CSV được hệ thống suy ra tạm thời từ các trường trong tệp, chưa được phê duyệt; cần đối chiếu trước khi sử dụng chính thức. Các chỉ tiêu tích lũy hoặc tính theo ngày cần đặc biệt rà soát để tránh tổng hợp sai hoặc gộp trùng.
-- Các số liệu trên trang chưa được xác nhận, khóa kỳ, tự động chấm điểm, tính trọng số hay xếp hạng. Những quy tắc này cần được bệnh viện phê duyệt trước khi triển khai.
+- Điểm theo ngưỡng CSV được tính tự động nhưng số liệu chưa được xác nhận hoặc khóa kỳ; chưa tính điểm cộng/trừ và chưa tự động xếp hạng. Ngưỡng dạng chữ hoặc theo tiến độ từng quý, ví dụ CME và chênh lệch thu–chi, chưa được tự chấm.
 - Sau thay đổi, cập nhật Firestore Rules từ `firestore.rules` và kiểm thử quyền, bao gồm tiêu chí chênh lệch thu–chi có thể âm; tải tệp lên GitHub không tự công bố quy tắc.
 
 ## 📊 Thang điểm
@@ -107,16 +110,12 @@ npm run build
 | 50–dưới 75 | Hoàn thành |
 | Dưới 50 | Chưa hoàn thành |
 
-Điểm lẻ được xét theo khoảng liên tục. Ngưỡng điểm không tự bảo đảm tỷ lệ phân nhóm.
-Trọng số và ngưỡng là đề xuất của bệnh viện, không phải tỷ lệ do WHO quy định.
-
 ## 📞 Liên hệ
 
 **Phòng Tổ chức Cán bộ - Bệnh viện Đa khoa Thủ Đức**
 
-- 📧 Email: toccb@benhvienthuduc.vn
-- 📞 Điện thoại: (028) 6280 1000
-- 🏢 Văn phòng: Tầng 2, BV Đa khoa Thủ Đức
+- 📧 Email: phongtccb@bvdktd.vn
+- 🏢 Văn phòng: Trung tâm Hành chính - Đào tạo, Bệnh viện Đa khoa Thủ Đức
 
 ## 📄 Tài liệu Tham khảo
 
