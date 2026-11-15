@@ -4,6 +4,7 @@ import { collection, doc, getDocs, onSnapshot, query, runTransaction, serverTime
 import { ADMIN_UID, auth, db } from '../firebase'
 import { normalizeUnitName, officialUnits, planUnitImport } from '../lib/officialUnits'
 import { benchmarkReferences, criterionDomains, criterionGroups, officialCriteria } from '../lib/officialCriteria'
+import { isSingleValuePercentage } from '../lib/scoring'
 import './SharedData.css'
 
 const monthlyStatusLabels = {
@@ -351,7 +352,7 @@ function CriteriaImport({ units, indicators, assignments }) {
 function formatCriterionTarget(criterion) {
   if (!criterion.threshold) return 'Chưa xác định trong tệp'
   if (criterion.threshold.toLocaleLowerCase('vi') === 'cân bằng') return 'Cân bằng'
-  if (criterion.method === 'ratio' && Number.isFinite(Number(criterion.threshold))) {
+  if ((criterion.method === 'ratio' || isSingleValuePercentage(criterion)) && Number.isFinite(Number(criterion.threshold))) {
     return `${criterion.direction || 'Chưa xác định'} ${(Number(criterion.threshold) * 100).toLocaleString('vi-VN')}%`
   }
   return `${criterion.direction || 'Chưa xác định'} ${criterion.threshold}`
@@ -451,7 +452,7 @@ function MonthlyCriterion({ criterion, record, unitId, year, month, mayEdit }) {
   const result = record?.status === 'collected'
     ? ['ratio', 'rate'].includes(criterion.method)
       ? `${record.numerator}/${record.denominator} = ${ratioValue?.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}${criterion.method === 'ratio' ? '%' : ''}`
-      : String(record.value)
+      : `${record.value}${isSingleValuePercentage(criterion) ? '%' : ''}`
     : monthlyStatusLabels[record?.status] || 'Chưa nhập số liệu'
   const hasGuideline = criterion.threshold && ['≥', '>=', '≤', '<=', '>', '<'].includes(criterion.direction)
 
@@ -463,7 +464,7 @@ function MonthlyCriterion({ criterion, record, unitId, year, month, mayEdit }) {
       </div>
       <p><strong>Số liệu hiện tại ({month}/{year}):</strong> {result}</p>
       <p><strong>Ngưỡng tham khảo trong CSV:</strong> {formatCriterionTarget(criterion)}</p>
-      {hasGuideline && <p>Chưa tự động kết luận đạt/chưa đạt; cần phê duyệt công thức và xác nhận dữ liệu.</p>}
+      {hasGuideline && <p>Điểm và kết luận theo ngưỡng CSV được hiển thị tại mục Theo dõi định kỳ; cần xác nhận dữ liệu trước khi sử dụng.</p>}
       {(criterion.numeratorLabel || criterion.denominatorLabel) && <p>
         {criterion.numeratorLabel && `Tử số/số liệu: ${criterion.numeratorLabel}`}
         {criterion.numeratorLabel && criterion.denominatorLabel && ' · '}
@@ -487,7 +488,7 @@ function MonthlyCriterion({ criterion, record, unitId, year, month, mayEdit }) {
           {status === 'collected' && (criterion.method === 'ratio' || criterion.method === 'rate' ? <>
             <label>{criterion.numeratorLabel || 'Tử số'}<input type="number" step="any" min="0" value={numerator} onChange={update(setNumerator)} required /></label>
             <label>{criterion.denominatorLabel || 'Mẫu số'}<input type="number" step="any" min="0" value={denominator} onChange={update(setDenominator)} required /></label>
-          </> : <label>{criterion.numeratorLabel || 'Số liệu chính'}<input type="number" step="any" value={value} onChange={update(setValue)} required /></label>)}
+          </> : <label>{criterion.numeratorLabel || 'Số liệu chính'}{isSingleValuePercentage(criterion) && ' (%) — nhập 80 cho 80%'}<input type="number" step="any" value={value} onChange={update(setValue)} required /></label>)}
           <label>Liên kết minh chứng<input type="url" maxLength={2048} value={evidenceUrl} onChange={update(setEvidenceUrl)} placeholder="https://" /></label>
           <label>Ghi chú<textarea maxLength={2000} value={note} onChange={update(setNote)} /></label>
           <button type="submit" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu số liệu tháng'}</button>
@@ -601,7 +602,7 @@ export default function SharedData() {
                 {monthOptions.map(item => <option key={item} value={item}>{item}</option>)}
               </select></label>
             </div>
-            <p>Điểm, xếp loại và kết luận đạt/chưa đạt chưa tự động tính. Ngưỡng và nội dung được trình bày theo CSV để đối chiếu.</p>
+            <p>Điểm và kết luận theo ngưỡng CSV được đồng bộ tại mục Theo dõi định kỳ; chưa tự động xếp loại. Với tỷ lệ nhập một ô, nhập 80 cho 80%; cần rà soát các số liệu đã nhập trước đây.</p>
             {monthlyLoading && <p>Đang tải số liệu tháng…</p>}
             {isAdmin && unitCriteria.some(item => !assignedIndicatorIds.has(item.id)) &&
               <p>Chưa nạp hoặc gán đủ tiêu chí cho nhóm. Quản trị viên có thể dùng mục “Nạp tiêu chí và phân công theo CSV”.</p>}

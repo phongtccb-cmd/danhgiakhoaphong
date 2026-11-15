@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { ADMIN_UID, auth, db } from '../firebase'
-import { countAvailableSummaries, monthsForPeriod, summarizeIndicator } from '../lib/monitoring'
-import { normalizeUnitName } from '../lib/officialUnits'
+import { monthsForPeriod, summarizeIndicator } from '../lib/monitoring'
+import { normalizeUnitName, officialUnits } from '../lib/officialUnits'
+import { benchmarkReferences, criterionDomains, officialCriteria } from '../lib/officialCriteria'
+import { buildScorebook, isSingleValuePercentage } from '../lib/scoring'
 import './SharedData.css'
 
 const domains = {
@@ -134,7 +136,7 @@ function MonitoringAdmin({ data }) {
   )
 }
 
-function MonthlyForm({ unitId, indicator, year, records, mayEdit }) {
+function MonthlyForm({ unitId, indicator, criterion, year, records, mayEdit }) {
   const [month, setMonth] = useState('01')
   const [status, setStatus] = useState('collected')
   const [numerator, setNumerator] = useState('')
@@ -228,7 +230,7 @@ function MonthlyForm({ unitId, indicator, year, records, mayEdit }) {
       {status === 'collected' && (indicator.method === 'ratio' || indicator.method === 'rate' ? <>
         <label>Tử số<input type="number" step="any" min="0" value={numerator} onChange={update(setNumerator)} required /></label>
         <label>Mẫu số<input type="number" step="any" min="0" value={denominator} onChange={update(setDenominator)} required /></label>
-      </> : <label>Giá trị<input type="number" step="any" min={indicator.allowNegative ? undefined : '0'} value={value} onChange={update(setValue)} required /></label>)}
+      </> : <label>Giá trị{criterion && isSingleValuePercentage(criterion) ? ' (%)' : ''}<input type="number" step="any" min={indicator.allowNegative ? undefined : '0'} value={value} onChange={update(setValue)} required /></label>)}
       <label>Liên kết minh chứng<input type="url" maxLength={2048} value={evidenceUrl} onChange={update(setEvidenceUrl)} placeholder="https://" /></label>
       <label>Ghi chú<textarea maxLength={2000} value={note} onChange={update(setNote)} /></label>
       <button type="submit" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu số liệu tháng'}</button>
@@ -237,7 +239,7 @@ function MonthlyForm({ unitId, indicator, year, records, mayEdit }) {
   )
 }
 
-function formatSummary(summary, method) {
+function formatSummary(summary, method, criterion) {
   if (summary.status === 'invalid') return 'Dữ liệu hoặc phương pháp không hợp lệ; cần kiểm tra trước khi tổng hợp.'
   if (summary.status === 'missing') return `Chưa đủ dữ liệu: tháng ${summary.months.join(', ')}`
   if (summary.status === 'not_due') return 'Chưa đến kỳ đo'
@@ -247,11 +249,36 @@ function formatSummary(summary, method) {
   const value = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(summary.value)
   if (method === 'ratio') return `${summary.numerator}/${summary.denominator} = ${value}%`
   if (method === 'rate') return `${summary.numerator}/${summary.denominator} = ${value}`
-  if (method === 'last') return `${value} (tháng ${summary.month})`
+  if (method === 'last') return `${value}${criterion && isSingleValuePercentage(criterion) ? '%' : ''} (tháng ${summary.month})`
   return value
 }
 
-function UnitTable({ title, units, target, onSelect, data, year, months, validYear }) {
+function formatPoints(value) {
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
+}
+
+function describeScore(score, maximum) {
+  if (!score || score.value === null) return 'Chưa xác định'
+  return `${score.complete ? '' : 'Tạm tính: '}${formatPoints(score.value)}/${maximum} điểm`
+}
+
+function scoreProgress(score) {
+  if (!score) return ''
+  return score.reference
+    ? `${score.determined}/${score.total} đơn vị đủ điểm lĩnh vực`
+    : `${score.determined}/${score.total} tiêu chí đã xác định`
+}
+
+function scoreTarget(criterion) {
+  if (!criterion.threshold) return 'Chưa xác định'
+  if ((criterion.method === 'ratio' || isSingleValuePercentage(criterion)) &&
+    /^-?\d+(?:\.\d+)?$/.test(criterion.threshold)) {
+    return `${criterion.direction} ${formatPoints(Number(criterion.threshold) * 100)}%`
+  }
+  return `${criterion.direction || ''} ${criterion.threshold}`.trim()
+}
+
+function UnitTable({ title, units, target, onSelect, scores, validYear }) {
   const sorted = [...units].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
   return (
     <div className="shared-card monitoring-group">
@@ -264,16 +291,13 @@ function UnitTable({ title, units, target, onSelect, data, year, months, validYe
               {Object.entries(domains).map(([key, text]) => <th scope="col" key={key}>{text}<br />{domainWeights[key]}%</th>)}
             </tr></thead>
             <tbody>{sorted.map(unit => {
-              const assignedIds = new Set(data.monitorAssignments.filter(item => item.unitId === unit.id).map(item => item.indicatorId))
-              const unitRecords = data.monthlyRecords.filter(item => item.unitId === unit.id && item.year === year)
               return <tr key={unit.id}>
                 <th scope="row"><button type="button" className="monitoring-unit-link" onClick={() => onSelect(unit.id)}>{unit.name}</button></th>
                 {Object.keys(domains).map(key => {
-                  const indicators = data.monitorIndicators.filter(item => assignedIds.has(item.id) && item.domain === key)
-                  const available = validYear ? countAvailableSummaries(indicators, unitRecords, months) : 0
+                  const score = scores[unit.id]?.[key]
                   return <td key={key}>
-                    <span aria-label="Chưa có quy định chấm điểm">—</span>
-                    {validYear && indicators.length > 0 && <small className="monitoring-progress">{available}/{indicators.length} chỉ tiêu có số liệu</small>}
+                    <span>{validYear ? describeScore(score, domainWeights[key]) : '—'}</span>
+                    {validYear && score && <small className="monitoring-progress">{scoreProgress(score)}</small>}
                   </td>
                 })}
               </tr>
@@ -312,8 +336,22 @@ export default function MonthlyTracker() {
   const validYear = /^(20\d{2}|2100)$/.test(year)
   const months = monthsForPeriod(period)
   const summary = indicator ? summarizeIndicator(records, months, indicator) : null
+  const scores = useMemo(() => validYear ? buildScorebook({
+    units: data.units,
+    indicators: data.monitorIndicators,
+    assignments: data.monitorAssignments,
+    records: data.monthlyRecords,
+    criteria: officialCriteria,
+    references: benchmarkReferences,
+    domains: criterionDomains,
+    officialUnits,
+    year,
+    months: monthsForPeriod(period),
+  }) : {}, [data, year, period, validYear])
   const mayEdit = user && (user.uid === ADMIN_UID || unitIds.includes(unitId))
   const selectedUnit = data.units.find(item => item.id === unitId)
+  const selectedScores = scores[unitId] || {}
+  const selectedCriterion = officialCriteria.find(item => item.id === indicatorId && item.group === selectedUnit?.group)
   const ungroupedUnits = data.units.filter(item => !Object.hasOwn(groups, item.group))
 
   return (
@@ -321,7 +359,7 @@ export default function MonthlyTracker() {
       <div className="container">
         <div className="section-title">
           <h2>Theo dõi định kỳ</h2>
-          <p>Dữ liệu công khai; số liệu tổng hợp là tạm tính, chưa xác nhận, chấm điểm hay xếp hạng.</p>
+          <p>Dữ liệu công khai; điểm tính từ số liệu và ngưỡng CSV, chưa xác nhận hoặc xếp hạng.</p>
         </div>
         {!selectedUnit && <details className="shared-card">
           <summary>Chỉ tiêu gợi ý tham khảo</summary>
@@ -361,13 +399,14 @@ export default function MonthlyTracker() {
             <div className="shared-card">
               <h3>Danh sách khoa phòng</h3>
               <p>Danh mục Firebase: {data.units.length}/49 đơn vị. Mục tiêu theo nhóm: 11, 31 và 7; số lượng chưa xác nhận tính chính xác của danh sách.</p>
-              <p>Chọn tên đơn vị để xem chi tiết. Dấu “—” nghĩa là chưa có quy định chấm điểm, không phải 0 điểm. Trên điện thoại, cuộn ngang bảng để xem đủ 5 lĩnh vực.</p>
-              <p>Số dưới dấu “—” là số chỉ tiêu đã có kết quả số liệu trong kỳ trên tổng số chỉ tiêu đã gán, không phải điểm. Số liệu được đồng bộ từ mục Dữ liệu đánh giá.</p>
+              <p>Chọn tên đơn vị để xem chi tiết. Chưa xác định không phải 0 điểm. Trên điện thoại, cuộn ngang bảng để xem đủ 5 lĩnh vực.</p>
+              <p>Điểm chia đều theo số tiêu chí CSV của từng lĩnh vực; đạt nhận đủ điểm, không đạt nhận 0. Điểm tạm tính khi còn tiêu chí hoặc đơn vị tham chiếu chưa đủ dữ liệu. Giá trị hiển thị làm tròn hai chữ số, tính toán không làm tròn từng tiêu chí.</p>
+              <p>Với tỷ lệ nhập một ô, nhập 80 cho 80%; cần rà soát và sửa số liệu đã nhập trước đây nếu dùng dạng 0,8.</p>
             </div>
             {Object.entries(groups).map(([key, title]) => (
-              <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} data={data} year={year} months={months} validYear={validYear} />
+              <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} scores={scores} validYear={validYear} />
             ))}
-            {ungroupedUnits.length > 0 && <UnitTable title="Chưa xác định nhóm" units={ungroupedUnits} onSelect={id => { setUnitId(id); setIndicatorId('') }} data={data} year={year} months={months} validYear={validYear} />}
+            {ungroupedUnits.length > 0 && <UnitTable title="Chưa xác định nhóm" units={ungroupedUnits} onSelect={id => { setUnitId(id); setIndicatorId('') }} scores={scores} validYear={validYear} />}
             {user?.uid === ADMIN_UID && <details className="shared-card"><summary>Cấu hình theo dõi</summary><MonitoringAdmin data={data} /></details>}
           </>}
           {selectedUnit && <>
@@ -377,13 +416,18 @@ export default function MonthlyTracker() {
             <p>{groups[selectedUnit.group] || 'Chưa xác định nhóm'}</p>
             {normalizeUnitName(selectedUnit.name) === normalizeUnitName('Khoa Nội tổng hợp') &&
               <p>Khoa Truyền nhiễm chưa hình thành nhân sự, hiện ghép chung tại Khoa Nội tổng hợp; chưa là đơn vị đánh giá riêng.</p>}
-            <p>Số liệu tháng dùng chung với mục Dữ liệu đánh giá. Chưa có quy định quy đổi chỉ tiêu thành điểm hoặc điểm cộng/trừ; không thể xác định đạt, chưa đạt hay điểm tổng.</p>
+            <p>Số liệu tháng dùng chung với mục Dữ liệu đánh giá. Điểm dựa trên ngưỡng số và chiều đạt rõ trong CSV; ngưỡng còn thiếu hoặc chưa rõ không tự chấm. Chưa có quy định điểm cộng/trừ.</p>
+            {selectedUnit.group === 'functional' && <p>Điểm tham chiếu Tài chính và An toàn là trung bình điểm cùng lĩnh vực của các đơn vị lâm sàng và cận lâm sàng đủ điểm; chưa đủ 38 đơn vị thì chỉ là tạm tính.</p>}
             <div className="monitoring-domain-grid">
               {Object.entries(domains).map(([key, text]) => <div className="score-item" key={key}>
-                <strong>{text} · {domainWeights[key]}%</strong><span>Điểm: Chưa có quy định</span>
+                <strong>{text} · {domainWeights[key]} điểm</strong>
+                <span>{validYear ? describeScore(selectedScores[key], domainWeights[key]) : 'Chưa xác định'}</span>
+                {validYear && selectedScores[key] && <span>{scoreProgress(selectedScores[key])}</span>}
+                {validYear && selectedScores[key]?.results && <span>
+                  Mỗi tiêu chí: {domainWeights[key]} / {selectedScores[key].total} = {formatPoints(domainWeights[key] / selectedScores[key].total)} điểm tối đa
+                </span>}
               </div>)}
             </div>
-            <p>Chỉ tiêu đạt: Chưa xác định · Chỉ tiêu chưa đạt: Chưa xác định</p>
             <p>Điểm cộng: Chưa có quy định · Điểm trừ: Chưa có quy định</p>
           </div>
           <div className="shared-card shared-form">
@@ -397,15 +441,26 @@ export default function MonthlyTracker() {
           </div>
           {validYear && <div className="shared-card">
             <h3>Chỉ tiêu đã gán</h3>
+            {Object.values(selectedScores).flatMap(score => score.results || []).filter(result =>
+              result.reason === 'Chưa gán hoặc định nghĩa không khớp CSV'
+            ).map(result => <p className="shared-error" key={result.criterion.id}>
+              {result.criterion.code} · {result.criterion.name}: {result.reason}.
+            </p>)}
             {indicators.length === 0 ? <p>Chưa có chỉ tiêu được gán cho đơn vị.</p> : <div className="score-list">
               {indicators.map(item => {
                 const indicatorRecords = data.monthlyRecords.filter(record => record.unitId === unitId && record.indicatorId === item.id && record.year === year)
                 const result = summarizeIndicator(indicatorRecords, months, item)
+                const scored = selectedScores[item.domain]?.results?.find(entry => entry.criterion.id === item.id)
                 return <div className="score-item" key={item.id}>
                   <strong>{item.name}</strong>
                   <span>{domains[item.domain] || 'Chưa xác định lĩnh vực'} · {methods[item.method] || 'Phương pháp không hợp lệ'}</span>
-                  <span>Tổng hợp tạm tính: {formatSummary(result, item.method)}</span>
-                  <span>Đạt/chưa đạt: Chưa có quy định</span>
+                  <span>Tổng hợp tạm tính: {formatSummary(result, item.method, scored?.criterion)}</span>
+                  {scored && <span>Ngưỡng CSV: {scoreTarget(scored.criterion)}</span>}
+                  <span>{scored
+                    ? scored.status === 'pending'
+                      ? `Chưa xác định (${scored.reason}); tối đa ${formatPoints(scored.maximum)} điểm`
+                      : `${scored.status === 'achieved' ? 'Đạt' : 'Không đạt'}: ${formatPoints(scored.points)}/${formatPoints(scored.maximum)} điểm`
+                    : 'Chưa có quy định chấm điểm cho chỉ tiêu ngoài CSV'}</span>
                   <button type="button" onClick={() => setIndicatorId(item.id)}>Xem số liệu tháng</button>
                 </div>
               })}
@@ -413,20 +468,20 @@ export default function MonthlyTracker() {
           </div>}
           {indicator && validYear && <div className="shared-card">
             <h3>Tổng hợp tạm tính</h3>
-            <p>{formatSummary(summary, indicator.method)}</p>
+            <p>{formatSummary(summary, indicator.method, selectedCriterion)}</p>
             <div className="score-list">
               {months.map(month => {
                 const item = records.find(record => Number(record.month) === month)
                 return <div key={month} className="score-item">
                   <strong>Tháng {month}: {item ? statuses[item.status] : 'Chưa nhập — thiếu dữ liệu'}</strong>
-                  {item?.status === 'collected' && <span>{['ratio', 'rate'].includes(indicator.method) ? `${item.numerator}/${item.denominator}` : item.value}</span>}
+                  {item?.status === 'collected' && <span>{['ratio', 'rate'].includes(indicator.method) ? `${item.numerator}/${item.denominator}` : `${item.value}${selectedCriterion && isSingleValuePercentage(selectedCriterion) ? '%' : ''}`}</span>}
                   {item?.note && <span>{item.note}</span>}
                   {item?.evidenceUrl && /^https?:\/\/\S+$/i.test(item.evidenceUrl) && <a href={item.evidenceUrl} target="_blank" rel="noopener noreferrer">Xem minh chứng</a>}
                 </div>
               })}
             </div>
           </div>}
-          {validYear && <MonthlyForm unitId={unitId} indicator={indicator} year={year} records={records} mayEdit={mayEdit} />}
+          {validYear && <MonthlyForm unitId={unitId} indicator={indicator} criterion={selectedCriterion} year={year} records={records} mayEdit={mayEdit} />}
           </>}
         </>}
       </div>
