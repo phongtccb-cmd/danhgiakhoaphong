@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { ADMIN_UID, auth, db } from '../firebase'
-import { summarizeMonths } from '../lib/monitoring'
+import { countAvailableSummaries, monthsForPeriod, summarizeIndicator } from '../lib/monitoring'
 import { normalizeUnitName } from '../lib/officialUnits'
 import './SharedData.css'
 
@@ -228,7 +228,7 @@ function MonthlyForm({ unitId, indicator, year, records, mayEdit }) {
       {status === 'collected' && (indicator.method === 'ratio' || indicator.method === 'rate' ? <>
         <label>Tử số<input type="number" step="any" min="0" value={numerator} onChange={update(setNumerator)} required /></label>
         <label>Mẫu số<input type="number" step="any" min="0" value={denominator} onChange={update(setDenominator)} required /></label>
-      </> : <label>Giá trị<input type="number" step="any" min="0" value={value} onChange={update(setValue)} required /></label>)}
+      </> : <label>Giá trị<input type="number" step="any" min={indicator.allowNegative ? undefined : '0'} value={value} onChange={update(setValue)} required /></label>)}
       <label>Liên kết minh chứng<input type="url" maxLength={2048} value={evidenceUrl} onChange={update(setEvidenceUrl)} placeholder="https://" /></label>
       <label>Ghi chú<textarea maxLength={2000} value={note} onChange={update(setNote)} /></label>
       <button type="submit" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu số liệu tháng'}</button>
@@ -251,7 +251,7 @@ function formatSummary(summary, method) {
   return value
 }
 
-function UnitTable({ title, units, target, onSelect }) {
+function UnitTable({ title, units, target, onSelect, data, year, months, validYear }) {
   const sorted = [...units].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
   return (
     <div className="shared-card monitoring-group">
@@ -263,10 +263,21 @@ function UnitTable({ title, units, target, onSelect }) {
               <th scope="col">Khoa phòng</th>
               {Object.entries(domains).map(([key, text]) => <th scope="col" key={key}>{text}<br />{domainWeights[key]}%</th>)}
             </tr></thead>
-            <tbody>{sorted.map(unit => <tr key={unit.id}>
-              <th scope="row"><button type="button" className="monitoring-unit-link" onClick={() => onSelect(unit.id)}>{unit.name}</button></th>
-              {Object.keys(domains).map(key => <td key={key} aria-label="Chưa có quy định chấm điểm">—</td>)}
-            </tr>)}</tbody>
+            <tbody>{sorted.map(unit => {
+              const assignedIds = new Set(data.monitorAssignments.filter(item => item.unitId === unit.id).map(item => item.indicatorId))
+              const unitRecords = data.monthlyRecords.filter(item => item.unitId === unit.id && item.year === year)
+              return <tr key={unit.id}>
+                <th scope="row"><button type="button" className="monitoring-unit-link" onClick={() => onSelect(unit.id)}>{unit.name}</button></th>
+                {Object.keys(domains).map(key => {
+                  const indicators = data.monitorIndicators.filter(item => assignedIds.has(item.id) && item.domain === key)
+                  const available = validYear ? countAvailableSummaries(indicators, unitRecords, months) : 0
+                  return <td key={key}>
+                    <span aria-label="Chưa có quy định chấm điểm">—</span>
+                    {validYear && indicators.length > 0 && <small className="monitoring-progress">{available}/{indicators.length} chỉ tiêu có số liệu</small>}
+                  </td>
+                })}
+              </tr>
+            })}</tbody>
           </table>
         </div>
       )}
@@ -282,7 +293,7 @@ export default function MonthlyTracker() {
   const [unitId, setUnitId] = useState('')
   const [indicatorId, setIndicatorId] = useState('')
   const [year, setYear] = useState(String(new Date().getFullYear()))
-  const [period, setPeriod] = useState('1')
+  const [period, setPeriod] = useState(`month${String(new Date().getMonth() + 1).padStart(2, '0')}`)
 
   useEffect(() => onAuthStateChanged(auth, setUser, err => setAccessError(`Không thể kiểm tra tài khoản: ${err.message}`)), [])
   useEffect(() => {
@@ -299,9 +310,8 @@ export default function MonthlyTracker() {
   const indicator = indicators.find(item => item.id === indicatorId)
   const records = data.monthlyRecords.filter(item => item.unitId === unitId && item.indicatorId === indicatorId && item.year === year)
   const validYear = /^(20\d{2}|2100)$/.test(year)
-  const months = period === 'year' ? Array.from({ length: 12 }, (_, index) => index + 1)
-    : Array.from({ length: 3 }, (_, index) => (Number(period) - 1) * 3 + index + 1)
-  const summary = indicator ? summarizeMonths(records.map(item => ({ ...item, month: Number(item.month) })), months, indicator.method, indicator.allowNegative) : null
+  const months = monthsForPeriod(period)
+  const summary = indicator ? summarizeIndicator(records, months, indicator) : null
   const mayEdit = user && (user.uid === ADMIN_UID || unitIds.includes(unitId))
   const selectedUnit = data.units.find(item => item.id === unitId)
   const ungroupedUnits = data.units.filter(item => !Object.hasOwn(groups, item.group))
@@ -330,16 +340,34 @@ export default function MonthlyTracker() {
         {(error || accessError) && <p className="shared-error" role="alert">{error || accessError}</p>}
         {loading && !error && <p>Đang tải dữ liệu theo dõi…</p>}
         {!loading && !error && <>
+          <div className="shared-card shared-form month-controls">
+            <label>Năm<input type="number" min="2000" max="2100" value={year} onChange={event => setYear(event.target.value)} /></label>
+            <label>Kỳ theo dõi<select value={period} onChange={event => setPeriod(event.target.value)}>
+              <optgroup label="Tháng">
+                {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map(month =>
+                  <option key={month} value={`month${month}`}>Tháng {month}</option>
+                )}
+              </optgroup>
+              <optgroup label="Quý">
+                <option value="quarter1">Quý I</option><option value="quarter2">Quý II</option><option value="quarter3">Quý III</option><option value="quarter4">Quý IV</option>
+              </optgroup>
+              <option value="year">Cả năm</option>
+            </select></label>
+            {!validYear && <p className="shared-error">Nhập năm từ 2000 đến 2100.</p>}
+            {(period === 'year' || period.startsWith('quarter')) &&
+              <p>Kết quả quý/năm chỉ để tham khảo. Phương pháp tổng hợp tiêu chí CSV chưa được phê duyệt; cần rà soát, đặc biệt với số liệu tích lũy hoặc tính theo ngày.</p>}
+          </div>
           {!selectedUnit && <>
             <div className="shared-card">
               <h3>Danh sách khoa phòng</h3>
               <p>Danh mục Firebase: {data.units.length}/49 đơn vị. Mục tiêu theo nhóm: 11, 31 và 7; số lượng chưa xác nhận tính chính xác của danh sách.</p>
               <p>Chọn tên đơn vị để xem chi tiết. Dấu “—” nghĩa là chưa có quy định chấm điểm, không phải 0 điểm. Trên điện thoại, cuộn ngang bảng để xem đủ 5 lĩnh vực.</p>
+              <p>Số dưới dấu “—” là số chỉ tiêu đã có kết quả số liệu trong kỳ trên tổng số chỉ tiêu đã gán, không phải điểm. Số liệu được đồng bộ từ mục Dữ liệu đánh giá.</p>
             </div>
             {Object.entries(groups).map(([key, title]) => (
-              <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} />
+              <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} data={data} year={year} months={months} validYear={validYear} />
             ))}
-            {ungroupedUnits.length > 0 && <UnitTable title="Chưa xác định nhóm" units={ungroupedUnits} onSelect={id => { setUnitId(id); setIndicatorId('') }} />}
+            {ungroupedUnits.length > 0 && <UnitTable title="Chưa xác định nhóm" units={ungroupedUnits} onSelect={id => { setUnitId(id); setIndicatorId('') }} data={data} year={year} months={months} validYear={validYear} />}
             {user?.uid === ADMIN_UID && <details className="shared-card"><summary>Cấu hình theo dõi</summary><MonitoringAdmin data={data} /></details>}
           </>}
           {selectedUnit && <>
@@ -349,7 +377,7 @@ export default function MonthlyTracker() {
             <p>{groups[selectedUnit.group] || 'Chưa xác định nhóm'}</p>
             {normalizeUnitName(selectedUnit.name) === normalizeUnitName('Khoa Nội tổng hợp') &&
               <p>Khoa Truyền nhiễm chưa hình thành nhân sự, hiện ghép chung tại Khoa Nội tổng hợp; chưa là đơn vị đánh giá riêng.</p>}
-            <p>Chưa có quy định quy đổi chỉ tiêu thành điểm, ngưỡng đạt hoặc điểm cộng/trừ. Không thể xác định đạt, chưa đạt hay điểm tổng.</p>
+            <p>Số liệu tháng dùng chung với mục Dữ liệu đánh giá. Chưa có quy định quy đổi chỉ tiêu thành điểm hoặc điểm cộng/trừ; không thể xác định đạt, chưa đạt hay điểm tổng.</p>
             <div className="monitoring-domain-grid">
               {Object.entries(domains).map(([key, text]) => <div className="score-item" key={key}>
                 <strong>{text} · {domainWeights[key]}%</strong><span>Điểm: Chưa có quy định</span>
@@ -365,11 +393,6 @@ export default function MonthlyTracker() {
               <option value="">Chọn chỉ tiêu đã áp dụng</option>{indicators.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select></label>
             {unitId && indicators.length === 0 && <p>Chưa có chỉ tiêu được gán cho đơn vị này; không tự coi là 0 điểm.</p>}
-            <label>Năm<input type="number" min="2000" max="2100" value={year} onChange={event => setYear(event.target.value)} /></label>
-            <label>Kỳ tổng hợp<select value={period} onChange={event => setPeriod(event.target.value)}>
-              <option value="1">Quý I</option><option value="2">Quý II</option><option value="3">Quý III</option><option value="4">Quý IV</option><option value="year">Cả năm</option>
-            </select></label>
-            {!validYear && <p className="shared-error">Nhập năm từ 2000 đến 2100.</p>}
             {indicator && <p>{domains[indicator.domain]} · {methods[indicator.method]}{indicator.unit && ` · Đơn vị số liệu gốc: ${indicator.unit}`}{indicator.source && ` · Nguồn: ${indicator.source}`}</p>}
           </div>
           {validYear && <div className="shared-card">
@@ -377,7 +400,7 @@ export default function MonthlyTracker() {
             {indicators.length === 0 ? <p>Chưa có chỉ tiêu được gán cho đơn vị.</p> : <div className="score-list">
               {indicators.map(item => {
                 const indicatorRecords = data.monthlyRecords.filter(record => record.unitId === unitId && record.indicatorId === item.id && record.year === year)
-                const result = summarizeMonths(indicatorRecords.map(record => ({ ...record, month: Number(record.month) })), months, item.method, item.allowNegative)
+                const result = summarizeIndicator(indicatorRecords, months, item)
                 return <div className="score-item" key={item.id}>
                   <strong>{item.name}</strong>
                   <span>{domains[item.domain] || 'Chưa xác định lĩnh vực'} · {methods[item.method] || 'Phương pháp không hợp lệ'}</span>
