@@ -13,7 +13,7 @@ export default function FAQ() {
     },
     {
       id: 2,
-      question: 'Khoa ngoài sẽ luôn xếp cao hơn khoa nội vì doanh thu?',
+      question: 'Khoa Ngoại sẽ luôn xếp cao hơn khoa nội vì doanh thu?',
       answer: 'Cần so sánh trong các nhóm có chức năng tương đồng. Lĩnh vực tài chính 20% sử dụng chỉ tiêu phù hợp từng đơn vị: phòng hành chính không bị áp doanh thu hoặc lợi nhuận. Chất lượng và an toàn chiếm tổng cộng 44%; chỉ tiêu và cách chấm cần được công bố trước.'
     },
     {
@@ -63,7 +63,6 @@ export default function FAQ() {
       <div className="container">
         <div className="section-title">
           <h2>Câu hỏi Thường Gặp</h2>
-          <p>Giải đáp những thắc mắc phổ biến về hệ thống đánh giá</p>
         </div>
 
         <div className="faq-container">
@@ -93,11 +92,10 @@ export default function FAQ() {
 
         <div className="faq-contact">
           <h3>Không tìm thấy câu trả lời?</h3>
-          <p>Liên hệ trực tiếp với Phòng Tổ chức Cán bộ để được hỗ trợ thêm</p>
+          <p>Liên hệ trực tiếp với Phòng Tổ chức Cán bộ để được hỗ trợ thêm.</p>
           <div className="contact-info">
-            <p><strong>📧 Email:</strong> toccb@benhvienthuduc.vn</p>
-            <p><strong>📞 Điện thoại:</strong> (028) 6280 1000 (ext. TCCB)</p>
-            <p><strong>🏢 Văn phòng:</strong> Tầng 2, Bệnh viện Đa khoa Thủ Đức</p>
+            <p><strong>📧 Email:</strong> phongtccb@bvdktd.vn</p>
+            <p><strong>🏢 Văn phòng:</strong> Trung tâm Hành chính - Đào tạo, Bệnh viện Đa khoa Thủ Đức</p>
           </div>
         </div>
       </div>

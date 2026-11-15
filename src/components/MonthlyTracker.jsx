@@ -359,7 +359,6 @@ export default function MonthlyTracker() {
       <div className="container">
         <div className="section-title">
           <h2>Theo dõi định kỳ</h2>
-          <p>Dữ liệu công khai; điểm tính từ số liệu và ngưỡng CSV, chưa xác nhận hoặc xếp hạng.</p>
         </div>
         {!selectedUnit && <details className="shared-card">
           <summary>Chỉ tiêu gợi ý tham khảo</summary>
@@ -396,13 +395,7 @@ export default function MonthlyTracker() {
               <p>Kết quả quý/năm chỉ để tham khảo. Phương pháp tổng hợp tiêu chí CSV chưa được phê duyệt; cần rà soát, đặc biệt với số liệu tích lũy hoặc tính theo ngày.</p>}
           </div>
           {!selectedUnit && <>
-            <div className="shared-card">
-              <h3>Danh sách khoa phòng</h3>
-              <p>Danh mục Firebase: {data.units.length}/49 đơn vị. Mục tiêu theo nhóm: 11, 31 và 7; số lượng chưa xác nhận tính chính xác của danh sách.</p>
-              <p>Chọn tên đơn vị để xem chi tiết. Chưa xác định không phải 0 điểm. Trên điện thoại, cuộn ngang bảng để xem đủ 5 lĩnh vực.</p>
-              <p>Điểm chia đều theo số tiêu chí CSV của từng lĩnh vực; đạt nhận đủ điểm, không đạt nhận 0. Điểm tạm tính khi còn tiêu chí hoặc đơn vị tham chiếu chưa đủ dữ liệu. Giá trị hiển thị làm tròn hai chữ số, tính toán không làm tròn từng tiêu chí.</p>
-              <p>Với tỷ lệ nhập một ô, nhập 80 cho 80%; cần rà soát và sửa số liệu đã nhập trước đây nếu dùng dạng 0,8.</p>
-            </div>
+            <h3>Danh sách khoa phòng</h3>
             {Object.entries(groups).map(([key, title]) => (
               <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} scores={scores} validYear={validYear} />
             ))}

@@ -49,14 +49,6 @@ export default function EvaluationSystem() {
       <div className="container">
         <div className="section-title">
           <h2>Đề xuất 5 lĩnh vực đánh giá</h2>
-          <p>Trọng số được phân bổ lại từ lĩnh vực chỉ tiêu riêng cho 5 lĩnh vực còn lại; tổng trọng số 100%.</p>
-          <p>
-            Tham khảo các chiều kích trong{' '}
-            <a href="https://doi.org/10.1186/s12913-022-07863-0" target="_blank" rel="noopener noreferrer">
-              Amer và cộng sự (2022)
-            </a>
-            . Trọng số là đề xuất của bệnh viện, không phải trọng số do nghiên cứu quy định.
-          </p>
         </div>
 
         <div className="domains-grid">
@@ -78,32 +70,8 @@ export default function EvaluationSystem() {
           ))}
         </div>
 
-        <div className="weight-distribution">
-          <h3>Phân bổ trọng số</h3>
-          <div className="weight-bars">
-            {domains.map(domain => (
-              <div key={domain.id} className="weight-item">
-                <div className="weight-label">
-                  <span className="domain-name">{domain.name}</span>
-                  <span className="weight-value">{domain.weight}</span>
-                </div>
-                <div className="weight-bar-container">
-                  <div 
-                    className="weight-bar" 
-                    style={{
-                      width: domain.weight,
-                      backgroundColor: domain.color
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         <div className="scoring-table">
           <h3>Thang điểm & Phân loại</h3>
-          <p>Điểm lẻ được xếp theo khoảng liên tục. Mục tiêu tỷ lệ 20% – 30% – 50% cần có quy định xếp hạng riêng; các ngưỡng điểm không tự bảo đảm tỷ lệ này.</p>
           <table>
             <thead>
               <tr>
@@ -142,7 +110,7 @@ export default function EvaluationSystem() {
             <div className="principle">
               <div className="principle-icon">✅</div>
               <h4>Công bằng</h4>
-              <p>So sánh riêng trong loại (khoa ngoài vs khoa ngoài; khoa nội vs khoa nội)</p>
+              <p>So sánh riêng trong loại (Khoa Ngoại với Khoa Ngoại; khoa nội với khoa nội)</p>
             </div>
             <div className="principle">
               <div className="principle-icon">📊</div>

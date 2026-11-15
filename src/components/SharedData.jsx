@@ -545,7 +545,6 @@ export default function SharedData() {
       <div className="container">
         <div className="section-title">
           <h2>Dữ liệu đánh giá</h2>
-          <p>Bộ tiêu chí theo CSV, cập nhật số liệu từng tháng. Dữ liệu và liên kết minh chứng được công khai; không nhập thông tin nhạy cảm.</p>
         </div>
         <Login user={user} loading={loading} />
         {(error || accessError) && <p className="shared-error" role="alert">{error || accessError}</p>}
@@ -602,7 +601,7 @@ export default function SharedData() {
                 {monthOptions.map(item => <option key={item} value={item}>{item}</option>)}
               </select></label>
             </div>
-            <p>Điểm và kết luận theo ngưỡng CSV được đồng bộ tại mục Theo dõi định kỳ; chưa tự động xếp loại. Với tỷ lệ nhập một ô, nhập 80 cho 80%; cần rà soát các số liệu đã nhập trước đây.</p>
+            <p>Điểm và kết luận theo ngưỡng CSV được đồng bộ tại mục Theo dõi định kỳ; chưa tự động xếp loại.</p>
             {monthlyLoading && <p>Đang tải số liệu tháng…</p>}
             {isAdmin && unitCriteria.some(item => !assignedIndicatorIds.has(item.id)) &&
               <p>Chưa nạp hoặc gán đủ tiêu chí cho nhóm. Quản trị viên có thể dùng mục “Nạp tiêu chí và phân công theo CSV”.</p>}
