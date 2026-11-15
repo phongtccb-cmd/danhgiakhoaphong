@@ -110,7 +110,7 @@ export default function EvaluationSystem() {
             <div className="principle">
               <div className="principle-icon">✅</div>
               <h4>Công bằng</h4>
-              <p>So sánh riêng trong loại (Khoa Ngoại với Khoa Ngoại; khoa nội với khoa nội)</p>
+              <p>So sánh riêng trong từng nhóm tương đồng</p>
             </div>
             <div className="principle">
               <div className="principle-icon">📊</div>

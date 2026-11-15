@@ -380,20 +380,6 @@ export default function MonthlyTracker() {
         <div className="section-title">
           <h2>Theo dõi định kỳ</h2>
         </div>
-        {!selectedUnit && <details className="shared-card">
-          <summary>Chỉ tiêu gợi ý tham khảo</summary>
-          <p>Không tự động áp dụng; quản trị viên lựa chọn sau khi đối chiếu nhiệm vụ và nguồn dữ liệu.</p>
-          <ul>
-            <li>Tỷ lệ báo cáo định kỳ nộp đúng hạn.</li>
-            <li>Tỷ lệ nhiệm vụ đến hạn hoàn thành đúng hạn, loại trừ các đầu việc đã có chỉ tiêu riêng.</li>
-            <li>Tỷ lệ hoàn thành đào tạo bắt buộc đến hạn.</li>
-            <li>Tỷ lệ hành động khắc phục an toàn hoàn thành đúng hạn.</li>
-          </ul>
-          <p><strong>Lâm sàng và cơ sở:</strong> tuân thủ phác đồ, khám đúng thời gian mục tiêu, tuân thủ quy trình an toàn.</p>
-          <p><strong>Cận lâm sàng:</strong> trả kết quả thường quy hoặc cấp cứu đúng hạn, thông báo kết quả nguy cấp đúng quy trình, ngoại kiểm theo lịch.</p>
-          <p><strong>Phòng chức năng và khoa Dược:</strong> xử lý hồ sơ đúng hạn, sai sót cấp phát thuốc, bảo trì thiết bị đúng lịch.</p>
-          <p>Cần phân biệt phạm vi đo và không chấm trùng sự kiện hoặc đầu việc giữa các chỉ tiêu.</p>
-        </details>}
         {(error || accessError) && <p className="shared-error" role="alert">{error || accessError}</p>}
         {loading && !error && <p>Đang tải dữ liệu theo dõi…</p>}
         {!loading && !error && <>
