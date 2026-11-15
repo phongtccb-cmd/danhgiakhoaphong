@@ -87,11 +87,13 @@ npm run build
 ### Theo dõi tháng và tổng hợp kỳ
 
 - Bảng theo dõi lấy danh mục đơn vị từ Firebase và đối chiếu số lượng theo 3 nhóm (11/31/7); chưa đủ dữ liệu thì chỉ hiển thị những đơn vị đã có. Chọn tên đơn vị để xem các khía cạnh và số liệu chỉ tiêu đã gán.
+- Chọn tháng, quý hoặc năm ở tab **Theo dõi định kỳ** để xem số liệu đồng bộ từ **Dữ liệu đánh giá**. Bảng hiển thị số chỉ tiêu có kết quả số liệu trên tổng số chỉ tiêu đã gán cho từng lĩnh vực; đây không phải điểm.
 - Dấu “—”, tình trạng đạt/chưa đạt và điểm cộng/trừ chưa được tính khi chưa có quy định chấm điểm; không hiểu dữ liệu thiếu là 0 điểm.
-- Mục **Theo dõi định kỳ** là công cụ thử nghiệm riêng, giữ lại cấu hình theo dõi thủ công; tab **Dữ liệu đánh giá** là nơi dùng bộ tiêu chí CSV.
+- Hai tab cùng sử dụng các bộ sưu tập theo dõi và số liệu tháng trong Firestore. Bộ tiêu chí CSV cần được quản trị viên nạp và gán trước; các chỉ tiêu cấu hình thủ công vẫn được giữ lại.
 - Định nghĩa theo dõi và việc gán hiện chỉ được tạo mới, không sửa/xóa trên giao diện. Không có hiệu lực theo ngày; phải rà soát trước khi tạo và không dùng để thay đổi phạm vi chỉ tiêu theo từng kỳ. Danh mục này tách khỏi danh mục điểm nhập thủ công hiện có.
 - Người được cấp quyền nhập dữ liệu tháng của đơn vị: số liệu, thiếu dữ liệu, chưa đến kỳ đo hoặc không phát sinh. Không gán chỉ tiêu cho đơn vị nghĩa là chưa cấu hình áp dụng, không phải điểm 0.
 - Tổng hợp quý hoặc năm chỉ hiện số khi đã ghi trạng thái cho tất cả các tháng trong kỳ. Tỷ lệ gộp tử số và mẫu số rồi nhân 100; chỉ số trên mẫu số giữ nguyên đơn vị; cộng dồn cộng giá trị tháng; giá trị gần nhất lấy tháng có số liệu cuối cùng trong kỳ. Mẫu số bằng 0 được ghi là không phát sinh, không tính kết quả.
+- Phương pháp tổng hợp cho tiêu chí CSV được hệ thống suy ra tạm thời từ các trường trong tệp, chưa được phê duyệt; cần đối chiếu trước khi sử dụng chính thức. Các chỉ tiêu tích lũy hoặc tính theo ngày cần đặc biệt rà soát để tránh tổng hợp sai hoặc gộp trùng.
 - Các số liệu trên trang chưa được xác nhận, khóa kỳ, tự động chấm điểm, tính trọng số hay xếp hạng. Những quy tắc này cần được bệnh viện phê duyệt trước khi triển khai.
 - Sau thay đổi, cập nhật Firestore Rules từ `firestore.rules` và kiểm thử quyền, bao gồm tiêu chí chênh lệch thu–chi có thể âm; tải tệp lên GitHub không tự công bố quy tắc.
 
