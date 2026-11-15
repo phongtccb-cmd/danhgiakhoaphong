@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { parseCriteriaCsv } from './criteriaCsv.js'
 import { officialUnits } from './officialUnits.js'
-import { buildScorebook, scoreCriterion } from './scoring.js'
+import { buildScorebook, rankCompleteUnits, scoreCriterion } from './scoring.js'
 
 const csv = readFileSync(new URL('../../Tieu_chi_danh_gia_Quy_IV_2026_03_nhom.csv', import.meta.url), 'utf8')
 const { criteria, references } = parseCriteriaCsv(csv)
@@ -20,14 +20,19 @@ const data = (unit, item, value, month = '10') => ({
   ...(item.method === 'ratio' || item.method === 'rate'
     ? { numerator: value, denominator: 100 } : { value }),
 })
+const quarterData = (unit, item, value) => ['10', '11', '12'].map(month => data(unit, item, value, month))
 
 test('chia đều 19 điểm cho bốn tiêu chí; đạt, không đạt và thiếu dữ liệu khác nhau', () => {
   const unit = officialUnits.find(item => item.group === 'functional')
   const items = criteria.filter(item => item.group === 'functional' && item.domain === 'management')
   const input = {
     units: [unit], indicators: items.map(definition), assignments: items.map(item => ({ unitId: unit.id, indicatorId: item.id })),
-    records: [data(unit, items[0], 90), data(unit, items[1], 94), data(unit, items[2], 100)],
-    criteria, references, domains, officialUnits, year: '2026', months: [10],
+    records: [
+      ...quarterData(unit, items[0], 90),
+      ...quarterData(unit, items[1], 94),
+      ...quarterData(unit, items[2], 100),
+    ],
+    criteria, references, domains, officialUnits, year: '2026', period: 'quarter4',
   }
   const score = buildScorebook(input)[unit.id].management
   assert.equal(items.length, 4)
@@ -35,7 +40,7 @@ test('chia đều 19 điểm cho bốn tiêu chí; đạt, không đạt và thi
   assert.equal(score.value, 9.5)
   assert.equal(score.complete, false)
   assert.equal(score.results[0].maximum, 4.75)
-  input.records.push(data(unit, items[3], 90))
+  input.records.push(...quarterData(unit, items[3], 90))
   assert.equal(buildScorebook(input)[unit.id].management.value, 14.25)
   assert.equal(buildScorebook(input)[unit.id].management.complete, true)
 })
@@ -43,34 +48,34 @@ test('chia đều 19 điểm cho bốn tiêu chí; đạt, không đạt và thi
 test('không chấm ngưỡng chưa rõ, dữ liệu sai hoặc định nghĩa và phân công không khớp', () => {
   const unit = officialUnits.find(item => item.group === 'clinical')
   const item = criteria.find(entry => entry.group === 'clinical' && entry.code === 'K3.01')
-  assert.equal(scoreCriterion(item, definition(item), true, [data(unit, item, 0)], [10], 5).status, 'pending')
+  assert.equal(scoreCriterion(item, definition(item), true, quarterData(unit, item, 0), 'quarter4', 5).status, 'pending')
   const valid = criteria.find(entry => entry.group === 'clinical' && entry.code === 'K1.01')
-  const record = data(unit, valid, 90)
-  assert.equal(scoreCriterion(valid, definition(valid), false, [record], [10], 5).status, 'pending')
-  assert.equal(scoreCriterion(valid, { ...definition(valid), method: 'last' }, true, [record], [10], 5).status, 'pending')
-  assert.equal(scoreCriterion(valid, definition(valid), true, [{ ...record, denominator: 0 }], [10], 5).status, 'pending')
-  assert.equal(scoreCriterion(valid, definition(valid), true, [{ ...record, status: 'no_occurrence' }], [10], 5).status, 'pending')
-  assert.equal(scoreCriterion(valid, definition(valid), true, [record], [10, 11, 12], 5).status, 'pending')
+  const records = quarterData(unit, valid, 90)
+  assert.equal(scoreCriterion(valid, definition(valid), false, records, 'quarter4', 5).status, 'pending')
+  assert.equal(scoreCriterion(valid, { ...definition(valid), method: 'last' }, true, records, 'quarter4', 5).status, 'pending')
+  assert.equal(scoreCriterion(valid, definition(valid), true, records.map(record => ({ ...record, denominator: 0 })), 'quarter4', 5).status, 'pending')
+  assert.equal(scoreCriterion(valid, definition(valid), true, records.map(record => ({ ...record, status: 'no_occurrence' })), 'quarter4', 5).status, 'pending')
+  assert.equal(scoreCriterion(valid, definition(valid), true, records, 'year', 5).status, 'pending')
 })
 
 test('tỷ lệ một ô nhập theo phần trăm và tỷ lệ hai ô so sánh theo ngưỡng CSV', () => {
   const unit = officialUnits.find(item => item.group === 'clinical')
   const item = criteria.find(entry => entry.group === 'clinical' && entry.code === 'K2.07')
-  assert.equal(scoreCriterion(item, definition(item), true, [data(unit, item, 80)], [10], 6).status, 'achieved')
-  assert.equal(scoreCriterion(item, definition(item), true, [data(unit, item, 79)], [10], 6).status, 'failed')
+  assert.equal(scoreCriterion(item, definition(item), true, quarterData(unit, item, 80), 'quarter4', 6).status, 'achieved')
+  assert.equal(scoreCriterion(item, definition(item), true, quarterData(unit, item, 79), 'quarter4', 6).status, 'failed')
   const ratio = criteria.find(entry => entry.group === 'clinical' && entry.code === 'K1.01')
-  assert.equal(scoreCriterion(ratio, definition(ratio), true, [data(unit, ratio, 90)], [10], 6).status, 'achieved')
-  assert.equal(scoreCriterion(ratio, definition(ratio), true, [data(unit, ratio, 89)], [10], 6).status, 'failed')
+  assert.equal(scoreCriterion(ratio, definition(ratio), true, quarterData(unit, ratio, 90), 'quarter4', 6).status, 'achieved')
+  assert.equal(scoreCriterion(ratio, definition(ratio), true, quarterData(unit, ratio, 89), 'quarter4', 6).status, 'failed')
 })
 
 test('chấm kỳ quý theo số liệu tổng hợp của đủ ba tháng', () => {
   const unit = officialUnits.find(item => item.group === 'functional')
   const item = criteria.find(entry => entry.group === 'functional' && entry.code === 'K1.02')
   const records = [data(unit, item, 94, '10'), data(unit, item, 95, '11'), data(unit, item, 96, '12')]
-  const result = scoreCriterion(item, definition(item), true, records, [10, 11, 12], 4.75)
+  const result = scoreCriterion(item, definition(item), true, records, 'quarter4', 4.75)
   assert.equal(result.status, 'achieved')
   assert.equal(result.points, 4.75)
-  assert.equal(scoreCriterion(item, definition(item), true, records.slice(0, 2), [10, 11, 12], 4.75).status, 'pending')
+  assert.equal(scoreCriterion(item, definition(item), true, records.slice(0, 2), 'quarter4', 4.75).status, 'pending')
 })
 
 test('điểm tham chiếu trung bình theo đơn vị đủ điểm, chỉ đầy đủ khi có đủ 38 đơn vị', () => {
@@ -78,11 +83,11 @@ test('điểm tham chiếu trung bình theo đơn vị đủ điểm, chỉ đ�
   const candidates = officialUnits.filter(unit => ['clinical', 'paraclinical'].includes(unit.group))
   const items = criteria.filter(item => ['clinical', 'paraclinical'].includes(item.group) && item.domain === 'safety')
   const assignments = candidates.flatMap(unit => items.filter(item => item.group === unit.group).map(item => ({ unitId: unit.id, indicatorId: item.id })))
-  const records = candidates.flatMap((unit, index) => items.filter(item => item.group === unit.group).map(item => {
+  const records = candidates.flatMap((unit, index) => items.filter(item => item.group === unit.group).flatMap(item => {
     const pass = item.direction.includes('<') || item.direction === '≤' ? 0 : 100
-    return data(unit, item, index === 1 ? 0 : pass)
+    return quarterData(unit, item, index === 1 ? 0 : pass)
   }))
-  const input = { units: [functional, ...candidates], indicators: items.map(definition), assignments, records, criteria, references, domains, officialUnits, year: '2026', months: [10] }
+  const input = { units: [functional, ...candidates], indicators: items.map(definition), assignments, records, criteria, references, domains, officialUnits, year: '2026', period: 'quarter4' }
   const full = buildScorebook(input)[functional.id].safety
   assert.equal(full.complete, true)
   assert.equal(full.determined, 38)
@@ -98,4 +103,27 @@ test('điểm tham chiếu trung bình theo đơn vị đủ điểm, chỉ đ�
   assert.ok(Math.abs(partial.value - (20 + buildScorebook(input)[candidates[1].id].safety.value) / 2) < 1e-10)
   input.units = [functional]
   assert.equal(buildScorebook(input)[functional.id].safety.value, null)
+})
+
+test('xếp hạng riêng từng nhóm, đồng điểm cùng hạng và bỏ đơn vị chưa đủ điểm', () => {
+  const units = [
+    { id: 'a', group: 'clinical' },
+    { id: 'b', group: 'clinical' },
+    { id: 'c', group: 'clinical' },
+    { id: 'd', group: 'paraclinical' },
+    { id: 'e', group: 'clinical' },
+  ]
+  const scores = {
+    a: { totalScore: 90, totalComplete: true },
+    b: { totalScore: 90, totalComplete: true },
+    c: { totalScore: 75, totalComplete: true },
+    d: { totalScore: 20, totalComplete: true },
+    e: { totalScore: 100, totalComplete: false },
+  }
+  assert.deepEqual(rankCompleteUnits(units, scores), {
+    a: { rank: 1, eligibleCount: 3 },
+    b: { rank: 1, eligibleCount: 3 },
+    c: { rank: 3, eligibleCount: 3 },
+    d: { rank: 1, eligibleCount: 1 },
+  })
 })

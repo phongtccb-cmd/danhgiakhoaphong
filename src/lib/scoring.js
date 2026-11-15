@@ -1,4 +1,4 @@
-import { summarizeIndicator } from './monitoring.js'
+import { summarizePeriod } from './monitoring.js'
 import { normalizeUnitName } from './officialUnits.js'
 
 const singleValuePercentages = new Set([
@@ -21,14 +21,14 @@ function compare(value, threshold, direction) {
   }
 }
 
-export function scoreCriterion(criterion, indicator, assigned, records, months, maximum) {
+export function scoreCriterion(criterion, indicator, assigned, records, period, maximum) {
   const pending = reason => ({ status: 'pending', reason, maximum })
   if (!assigned || !indicator || indicator.name !== `${criterion.code} ${criterion.name}` ||
     indicator.domain !== criterion.domain || indicator.method !== criterion.method ||
     Boolean(indicator.allowNegative) !== criterion.allowNegative) {
     return pending('Chưa gán hoặc định nghĩa không khớp CSV')
   }
-  const summary = summarizeIndicator(records, months, indicator)
+  const summary = summarizePeriod(records, period, indicator)
   if (summary.status !== 'available') return { ...pending('Chưa có kết quả số liệu hợp lệ trong kỳ'), summary }
   if (!/^-?\d+(?:\.\d+)?$/.test(criterion.threshold)) return { ...pending('Ngưỡng chưa xác định rõ trong CSV'), summary }
   const threshold = Number(criterion.threshold)
@@ -40,7 +40,7 @@ export function scoreCriterion(criterion, indicator, assigned, records, months, 
   return { status: achieved ? 'achieved' : 'failed', points: achieved ? maximum : 0, maximum, summary }
 }
 
-export function buildScorebook({ units, indicators, assignments, records, criteria, references, domains, officialUnits, year, months }) {
+export function buildScorebook({ units, indicators, assignments, records, criteria, references, domains, officialUnits, year, period }) {
   const scores = {}
   const indicatorMap = new Map(indicators.map(indicator => [indicator.id, indicator]))
   const assignmentKeys = new Set(assignments.map(item => `${item.unitId}_${item.indicatorId}`))
@@ -59,7 +59,7 @@ export function buildScorebook({ units, indicators, assignments, records, criter
           indicatorMap.get(criterion.id),
           assignmentKeys.has(`${unit.id}_${criterion.id}`),
           yearRecords.filter(record => record.unitId === unit.id && record.indicatorId === criterion.id),
-          months,
+          period,
           maximum,
         ),
       }))
@@ -93,5 +93,40 @@ export function buildScorebook({ units, indicators, assignments, records, criter
       scores[unit.id][reference.domain] = referenceScore
     })
   }
+
+  for (const unit of units) {
+    const unitScores = scores[unit.id]
+    const domainScores = domains.map(domain => unitScores[domain.key])
+    const availableScores = domainScores.filter(score => Number.isFinite(score?.value))
+    unitScores.totalScore = availableScores.length
+      ? availableScores.reduce((total, score) => total + score.value, 0)
+      : null
+    unitScores.totalComplete = domainScores.length > 0 &&
+      domainScores.every(score => score?.complete && Number.isFinite(score.value))
+  }
   return scores
+}
+
+export function rankCompleteUnits(units, scores) {
+  const grouped = new Map()
+  for (const unit of units) {
+    const score = scores[unit.id]
+    if (!score?.totalComplete || !Number.isFinite(score.totalScore)) continue
+    const group = grouped.get(unit.group) || []
+    group.push({ id: unit.id, value: score.totalScore })
+    grouped.set(unit.group, group)
+  }
+
+  const rankings = {}
+  for (const candidates of grouped.values()) {
+    candidates.sort((left, right) => right.value - left.value)
+    let rank = 0
+    let previousValue
+    candidates.forEach((candidate, index) => {
+      if (previousValue === undefined || Math.abs(candidate.value - previousValue) > 1e-9) rank = index + 1
+      rankings[candidate.id] = { rank, eligibleCount: candidates.length }
+      previousValue = candidate.value
+    })
+  }
+  return rankings
 }

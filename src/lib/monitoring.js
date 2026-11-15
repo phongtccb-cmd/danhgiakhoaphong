@@ -4,13 +4,52 @@ export function monthsForPeriod(period) {
     const quarter = Number(period.slice(-1))
     return Array.from({ length: 3 }, (_, index) => (quarter - 1) * 3 + index + 1)
   }
-  if (/^month(0[1-9]|1[0-2])$/.test(period)) return [Number(period.slice(5))]
   throw new Error('Kỳ theo dõi không hợp lệ.')
 }
 
 export function summarizeIndicator(records, months, indicator) {
   const monthRecords = records.map(record => ({ ...record, month: Number(record.month) }))
   return summarizeMonths(monthRecords, months, indicator.method, indicator.allowNegative)
+}
+
+export function summarizePeriod(records, period, indicator) {
+  const monthRecords = records.map(record => ({ ...record, month: Number(record.month) }))
+  if (period !== 'year') {
+    return summarizeMonths(monthRecords, monthsForPeriod(period), indicator.method, indicator.allowNegative)
+  }
+
+  const quarters = [1, 2, 3, 4].map(quarter => {
+    const key = `quarter${quarter}`
+    return {
+      quarter,
+      result: summarizeMonths(monthRecords, monthsForPeriod(key), indicator.method, indicator.allowNegative),
+    }
+  })
+  const invalid = quarters.find(item => item.result.status === 'invalid')
+  if (invalid) return { status: 'invalid' }
+  const missing = quarters.filter(item => item.result.status === 'missing').map(item => item.quarter)
+  if (missing.length) return { status: 'missing', quarters: missing }
+
+  const collected = quarters.filter(item => item.result.status === 'available')
+  const noOccurrence = quarters.some(item => item.result.status === 'no_occurrence')
+  if (!collected.length) return { status: noOccurrence ? 'no_occurrence' : 'not_due' }
+
+  if (indicator.method === 'ratio' || indicator.method === 'rate') {
+    const numerator = collected.reduce((sum, item) => sum + item.result.numerator, 0)
+    const denominator = collected.reduce((sum, item) => sum + item.result.denominator, 0)
+    if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return { status: 'invalid' }
+    const value = numerator / denominator * (indicator.method === 'ratio' ? 100 : 1)
+    return Number.isFinite(value) ? { status: 'available', value, numerator, denominator } : { status: 'invalid' }
+  }
+  if (indicator.method === 'sum') {
+    const value = collected.reduce((sum, item) => sum + item.result.value, 0)
+    return Number.isFinite(value) ? { status: 'available', value } : { status: 'invalid' }
+  }
+  if (indicator.method === 'last') {
+    const last = collected.at(-1)
+    return { status: 'available', value: last.result.value, quarter: last.quarter, month: last.result.month }
+  }
+  return { status: 'invalid' }
 }
 
 export function countAvailableSummaries(indicators, records, months) {
