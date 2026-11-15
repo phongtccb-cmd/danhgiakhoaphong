@@ -84,20 +84,22 @@ npm run build
 - Hệ thống đối chiếu ngưỡng số và chiều đạt rõ trong CSV để tính điểm tại tab Theo dõi định kỳ. Một số trường đo/ngưỡng còn thiếu hoặc cần rà soát; các tiêu chí đó chưa được chấm. Liên kết minh chứng cần có quyền truy cập phù hợp và không chứa dữ liệu nhạy cảm.
 - Tài khoản được tạo trong Firebase Console, không tạo từ website. Chức năng không tải tệp minh chứng và không tự xóa dữ liệu.
 
-### Theo dõi tháng và tổng hợp kỳ
+### Theo dõi quý và tổng hợp năm
 
 - Bảng theo dõi lấy danh mục đơn vị từ Firebase và đối chiếu số lượng theo 3 nhóm (11/31/7); chưa đủ dữ liệu thì chỉ hiển thị những đơn vị đã có. Chọn tên đơn vị để xem các khía cạnh và số liệu chỉ tiêu đã gán.
-- Chọn tháng, quý hoặc năm ở tab **Theo dõi định kỳ** để xem điểm và số liệu đồng bộ từ **Dữ liệu đánh giá**.
+- Tab **Theo dõi định kỳ** chỉ chọn Quý I–IV hoặc Cả năm; số liệu nguồn vẫn được cập nhật theo tháng tại **Dữ liệu đánh giá**.
+- Kết quả năm được tổng hợp từ bốn kết quả quý. Mỗi quý cần đủ trạng thái số liệu của ba tháng tương ứng; thiếu quý nào thì kết quả năm báo thiếu quý đó.
 - Mỗi lĩnh vực có điểm tối đa bằng trọng số trên thang 100. Chia đều điểm tối đa cho các tiêu chí CSV của nhóm: đạt ngưỡng được đủ điểm tiêu chí, không đạt được 0. Tính toán không làm tròn từng tiêu chí, kết quả hiển thị tối đa hai chữ số thập phân.
+- Tổng điểm là tổng 5 lĩnh vực; thứ hạng tính riêng trong từng nhóm và chỉ áp dụng cho đơn vị đã đủ điểm cả 5 lĩnh vực. Đơn vị thiếu điểm vẫn có thể hiển thị tổng tạm tính nhưng chưa được xếp hạng. Đồng điểm cùng hạng theo kiểu cạnh tranh (1, 1, 3).
 - Thiếu dữ liệu, chưa đến kỳ, không phát sinh, ngưỡng hoặc chiều đạt chưa rõ, cấu hình không khớp CSV đều chưa xác định; không coi là không đạt hay 0 điểm. Điểm lĩnh vực chưa đủ tiêu chí chỉ là tổng tạm tính của các tiêu chí đã xác định.
 - Khối phòng ban và Dược dùng điểm tham chiếu Tài chính và An toàn là trung bình cộng điểm cùng lĩnh vực của từng đơn vị lâm sàng, cận lâm sàng đã đủ điểm lĩnh vực. Khi chưa đủ 38 đơn vị, trung bình này là tạm tính và hiển thị số đơn vị đã đủ điểm.
 - Tỷ lệ chỉ nhập một ô theo CSV (giường nội trú, vệ sinh tay) nhập theo phần trăm: 80 tương ứng 80%, không nhập 0,8. Cần rà soát các số liệu đã nhập trước khi sử dụng điểm. Tỷ lệ có tử số và mẫu số tiếp tục nhập hai số liệu gốc.
 - Hai tab cùng sử dụng các bộ sưu tập theo dõi và số liệu tháng trong Firestore. Bộ tiêu chí CSV cần được quản trị viên nạp và gán trước; các chỉ tiêu cấu hình thủ công vẫn được giữ lại.
 - Định nghĩa theo dõi và việc gán hiện chỉ được tạo mới, không sửa/xóa trên giao diện. Không có hiệu lực theo ngày; phải rà soát trước khi tạo và không dùng để thay đổi phạm vi chỉ tiêu theo từng kỳ. Danh mục này tách khỏi danh mục điểm nhập thủ công hiện có.
 - Người được cấp quyền nhập dữ liệu tháng của đơn vị: số liệu, thiếu dữ liệu, chưa đến kỳ đo hoặc không phát sinh. Không gán chỉ tiêu cho đơn vị nghĩa là chưa cấu hình áp dụng, không phải điểm 0.
-- Tổng hợp quý hoặc năm chỉ hiện số khi đã ghi trạng thái cho tất cả các tháng trong kỳ. Tỷ lệ gộp tử số và mẫu số rồi nhân 100; chỉ số trên mẫu số giữ nguyên đơn vị; cộng dồn cộng giá trị tháng; giá trị gần nhất lấy tháng có số liệu cuối cùng trong kỳ. Mẫu số bằng 0 được ghi là không phát sinh, không tính kết quả.
+- Từng quý tổng hợp dữ liệu ba tháng: tỷ lệ gộp tử số và mẫu số rồi nhân 100; chỉ số trên mẫu số giữ nguyên đơn vị; cộng dồn cộng giá trị tháng; giá trị gần nhất lấy tháng có số liệu cuối cùng trong quý. Kết quả năm gộp bốn quý theo cùng quy tắc; tỷ lệ gộp tử số/mẫu số quý, cộng dồn cộng giá trị quý, giá trị gần nhất lấy quý có số liệu cuối cùng. Mẫu số bằng 0 được ghi là không phát sinh, không tính kết quả.
 - Phương pháp tổng hợp cho tiêu chí CSV được hệ thống suy ra tạm thời từ các trường trong tệp, chưa được phê duyệt; cần đối chiếu trước khi sử dụng chính thức. Các chỉ tiêu tích lũy hoặc tính theo ngày cần đặc biệt rà soát để tránh tổng hợp sai hoặc gộp trùng.
-- Điểm theo ngưỡng CSV được tính tự động nhưng số liệu chưa được xác nhận hoặc khóa kỳ; chưa tính điểm cộng/trừ và chưa tự động xếp hạng. Ngưỡng dạng chữ hoặc theo tiến độ từng quý, ví dụ CME và chênh lệch thu–chi, chưa được tự chấm.
+- Điểm theo ngưỡng CSV được tính tự động nhưng số liệu chưa được xác nhận hoặc khóa kỳ; chưa tính điểm cộng/trừ. Ngưỡng dạng chữ hoặc theo tiến độ từng quý, ví dụ CME và chênh lệch thu–chi, chưa được tự chấm.
 - Sau thay đổi, cập nhật Firestore Rules từ `firestore.rules` và kiểm thử quyền, bao gồm tiêu chí chênh lệch thu–chi có thể âm; tải tệp lên GitHub không tự công bố quy tắc.
 
 ## 📊 Thang điểm
