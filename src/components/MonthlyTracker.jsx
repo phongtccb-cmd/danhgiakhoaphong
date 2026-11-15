@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { ADMIN_UID, auth, db } from '../firebase'
-import { monthsForPeriod, summarizeIndicator } from '../lib/monitoring'
+import { monthsForPeriod, summarizePeriod } from '../lib/monitoring'
 import { normalizeUnitName, officialUnits } from '../lib/officialUnits'
 import { benchmarkReferences, criterionDomains, officialCriteria } from '../lib/officialCriteria'
-import { buildScorebook, isSingleValuePercentage } from '../lib/scoring'
+import { buildScorebook, isSingleValuePercentage, rankCompleteUnits } from '../lib/scoring'
 import './SharedData.css'
 
 const domains = {
@@ -241,7 +241,9 @@ function MonthlyForm({ unitId, indicator, criterion, year, records, mayEdit }) {
 
 function formatSummary(summary, method, criterion) {
   if (summary.status === 'invalid') return 'Dữ liệu hoặc phương pháp không hợp lệ; cần kiểm tra trước khi tổng hợp.'
-  if (summary.status === 'missing') return `Chưa đủ dữ liệu: tháng ${summary.months.join(', ')}`
+  if (summary.status === 'missing') return summary.quarters
+    ? `Chưa đủ dữ liệu quý ${summary.quarters.join(', ')}`
+    : `Chưa đủ dữ liệu: tháng ${summary.months.join(', ')}`
   if (summary.status === 'not_due') return 'Chưa đến kỳ đo'
   if (summary.status === 'no_occurrence') return method === 'ratio'
     ? 'Không phát sinh; không tính tỷ lệ khi mẫu số bằng 0'
@@ -249,7 +251,10 @@ function formatSummary(summary, method, criterion) {
   const value = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(summary.value)
   if (method === 'ratio') return `${summary.numerator}/${summary.denominator} = ${value}%`
   if (method === 'rate') return `${summary.numerator}/${summary.denominator} = ${value}`
-  if (method === 'last') return `${value}${criterion && isSingleValuePercentage(criterion) ? '%' : ''} (tháng ${summary.month})`
+  if (method === 'last') {
+    const period = summary.quarter ? `Quý ${summary.quarter}, ` : ''
+    return `${value}${criterion && isSingleValuePercentage(criterion) ? '%' : ''} (${period}tháng ${summary.month})`
+  }
   return value
 }
 
@@ -269,6 +274,15 @@ function scoreProgress(score) {
     : `${score.determined}/${score.total} tiêu chí đã xác định`
 }
 
+function describeTotalScore(score) {
+  if (!score || score.totalScore === null) return 'Chưa đủ dữ liệu'
+  return `${score.totalComplete ? '' : 'Tạm tính: '}${formatPoints(score.totalScore)}/100 điểm`
+}
+
+function describeRank(rank) {
+  return rank ? `Hạng ${rank.rank}/${rank.eligibleCount}` : 'Chưa xếp hạng (điểm chưa đủ)'
+}
+
 function scoreTarget(criterion) {
   if (!criterion.threshold) return 'Chưa xác định'
   if ((criterion.method === 'ratio' || isSingleValuePercentage(criterion)) &&
@@ -278,7 +292,7 @@ function scoreTarget(criterion) {
   return `${criterion.direction || ''} ${criterion.threshold}`.trim()
 }
 
-function UnitTable({ title, units, target, onSelect, scores, validYear }) {
+function UnitTable({ title, units, target, onSelect, scores, rankings, validYear }) {
   const sorted = [...units].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
   return (
     <div className="shared-card monitoring-group">
@@ -288,13 +302,18 @@ function UnitTable({ title, units, target, onSelect, scores, validYear }) {
           <table className="monitoring-table">
             <thead><tr>
               <th scope="col">Khoa phòng</th>
+              <th scope="col">Tổng điểm / 100</th>
+              <th scope="col">Thứ hạng trong nhóm</th>
               {Object.entries(domains).map(([key, text]) => <th scope="col" key={key}>{text}<br />{domainWeights[key]}%</th>)}
             </tr></thead>
             <tbody>{sorted.map(unit => {
+              const unitScore = scores[unit.id]
               return <tr key={unit.id}>
                 <th scope="row"><button type="button" className="monitoring-unit-link" onClick={() => onSelect(unit.id)}>{unit.name}</button></th>
+                <td>{validYear ? describeTotalScore(unitScore) : '—'}</td>
+                <td>{validYear ? describeRank(rankings[unit.id]) : '—'}</td>
                 {Object.keys(domains).map(key => {
-                  const score = scores[unit.id]?.[key]
+                  const score = unitScore?.[key]
                   return <td key={key}>
                     <span>{validYear ? describeScore(score, domainWeights[key]) : '—'}</span>
                     {validYear && score && <small className="monitoring-progress">{scoreProgress(score)}</small>}
@@ -317,7 +336,7 @@ export default function MonthlyTracker() {
   const [unitId, setUnitId] = useState('')
   const [indicatorId, setIndicatorId] = useState('')
   const [year, setYear] = useState(String(new Date().getFullYear()))
-  const [period, setPeriod] = useState(`month${String(new Date().getMonth() + 1).padStart(2, '0')}`)
+  const [period, setPeriod] = useState(`quarter${Math.floor(new Date().getMonth() / 3) + 1}`)
 
   useEffect(() => onAuthStateChanged(auth, setUser, err => setAccessError(`Không thể kiểm tra tài khoản: ${err.message}`)), [])
   useEffect(() => {
@@ -334,8 +353,8 @@ export default function MonthlyTracker() {
   const indicator = indicators.find(item => item.id === indicatorId)
   const records = data.monthlyRecords.filter(item => item.unitId === unitId && item.indicatorId === indicatorId && item.year === year)
   const validYear = /^(20\d{2}|2100)$/.test(year)
-  const months = monthsForPeriod(period)
-  const summary = indicator ? summarizeIndicator(records, months, indicator) : null
+  const months = period === 'year' ? [] : monthsForPeriod(period)
+  const summary = indicator ? summarizePeriod(records, period, indicator) : null
   const scores = useMemo(() => validYear ? buildScorebook({
     units: data.units,
     indicators: data.monitorIndicators,
@@ -346,8 +365,9 @@ export default function MonthlyTracker() {
     domains: criterionDomains,
     officialUnits,
     year,
-    months: monthsForPeriod(period),
+    period,
   }) : {}, [data, year, period, validYear])
+  const rankings = useMemo(() => rankCompleteUnits(data.units, scores), [data.units, scores])
   const mayEdit = user && (user.uid === ADMIN_UID || unitIds.includes(unitId))
   const selectedUnit = data.units.find(item => item.id === unitId)
   const selectedScores = scores[unitId] || {}
@@ -380,26 +400,21 @@ export default function MonthlyTracker() {
           <div className="shared-card shared-form month-controls">
             <label>Năm<input type="number" min="2000" max="2100" value={year} onChange={event => setYear(event.target.value)} /></label>
             <label>Kỳ theo dõi<select value={period} onChange={event => setPeriod(event.target.value)}>
-              <optgroup label="Tháng">
-                {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map(month =>
-                  <option key={month} value={`month${month}`}>Tháng {month}</option>
-                )}
-              </optgroup>
-              <optgroup label="Quý">
-                <option value="quarter1">Quý I</option><option value="quarter2">Quý II</option><option value="quarter3">Quý III</option><option value="quarter4">Quý IV</option>
-              </optgroup>
+              <option value="quarter1">Quý I</option><option value="quarter2">Quý II</option><option value="quarter3">Quý III</option><option value="quarter4">Quý IV</option>
               <option value="year">Cả năm</option>
             </select></label>
             {!validYear && <p className="shared-error">Nhập năm từ 2000 đến 2100.</p>}
-            {(period === 'year' || period.startsWith('quarter')) &&
-              <p>Kết quả quý/năm chỉ để tham khảo. Phương pháp tổng hợp tiêu chí CSV chưa được phê duyệt; cần rà soát, đặc biệt với số liệu tích lũy hoặc tính theo ngày.</p>}
+            <p>{period === 'year'
+              ? 'Kết quả năm được tổng hợp từ 4 quý; mỗi quý được tính từ số liệu các tháng thuộc quý đó.'
+              : 'Kết quả quý được tổng hợp từ số liệu các tháng thuộc quý đã chọn.'} Phương pháp tổng hợp một số tiêu chí chưa được phê duyệt; cần rà soát trước khi sử dụng chính thức.</p>
           </div>
+          <p>Tổng điểm là tổng điểm 5 lĩnh vực. Xếp hạng riêng theo từng nhóm, chỉ áp dụng khi đủ điểm cả 5 lĩnh vực; đồng điểm cùng hạng.</p>
           {!selectedUnit && <>
             <h3>Danh sách khoa phòng</h3>
             {Object.entries(groups).map(([key, title]) => (
-              <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} scores={scores} validYear={validYear} />
+              <UnitTable key={key} title={title} target={groupTargets[key]} units={data.units.filter(item => item.group === key)} onSelect={id => { setUnitId(id); setIndicatorId('') }} scores={scores} rankings={rankings} validYear={validYear} />
             ))}
-            {ungroupedUnits.length > 0 && <UnitTable title="Chưa xác định nhóm" units={ungroupedUnits} onSelect={id => { setUnitId(id); setIndicatorId('') }} scores={scores} validYear={validYear} />}
+            {ungroupedUnits.length > 0 && <UnitTable title="Chưa xác định nhóm" units={ungroupedUnits} onSelect={id => { setUnitId(id); setIndicatorId('') }} scores={scores} rankings={rankings} validYear={validYear} />}
             {user?.uid === ADMIN_UID && <details className="shared-card"><summary>Cấu hình theo dõi</summary><MonitoringAdmin data={data} /></details>}
           </>}
           {selectedUnit && <>
@@ -411,6 +426,8 @@ export default function MonthlyTracker() {
               <p>Khoa Truyền nhiễm chưa hình thành nhân sự, hiện ghép chung tại Khoa Nội tổng hợp; chưa là đơn vị đánh giá riêng.</p>}
             <p>Số liệu tháng dùng chung với mục Dữ liệu đánh giá. Điểm dựa trên ngưỡng số và chiều đạt rõ trong CSV; ngưỡng còn thiếu hoặc chưa rõ không tự chấm. Chưa có quy định điểm cộng/trừ.</p>
             {selectedUnit.group === 'functional' && <p>Điểm tham chiếu Tài chính và An toàn là trung bình điểm cùng lĩnh vực của các đơn vị lâm sàng và cận lâm sàng đủ điểm; chưa đủ 38 đơn vị thì chỉ là tạm tính.</p>}
+            <p><strong>Tổng điểm:</strong> {describeTotalScore(selectedScores)}</p>
+            <p><strong>Thứ hạng trong nhóm:</strong> {describeRank(rankings[selectedUnit.id])}</p>
             <div className="monitoring-domain-grid">
               {Object.entries(domains).map(([key, text]) => <div className="score-item" key={key}>
                 <strong>{text} · {domainWeights[key]} điểm</strong>
@@ -442,7 +459,7 @@ export default function MonthlyTracker() {
             {indicators.length === 0 ? <p>Chưa có chỉ tiêu được gán cho đơn vị.</p> : <div className="score-list">
               {indicators.map(item => {
                 const indicatorRecords = data.monthlyRecords.filter(record => record.unitId === unitId && record.indicatorId === item.id && record.year === year)
-                const result = summarizeIndicator(indicatorRecords, months, item)
+                const result = summarizePeriod(indicatorRecords, period, item)
                 const scored = selectedScores[item.domain]?.results?.find(entry => entry.criterion.id === item.id)
                 return <div className="score-item" key={item.id}>
                   <strong>{item.name}</strong>
@@ -460,18 +477,25 @@ export default function MonthlyTracker() {
             </div>}
           </div>}
           {indicator && validYear && <div className="shared-card">
-            <h3>Tổng hợp tạm tính</h3>
+            <h3>{period === 'year' ? 'Kết quả năm (tổng hợp 4 quý)' : 'Kết quả quý'}</h3>
             <p>{formatSummary(summary, indicator.method, selectedCriterion)}</p>
             <div className="score-list">
-              {months.map(month => {
-                const item = records.find(record => Number(record.month) === month)
-                return <div key={month} className="score-item">
-                  <strong>Tháng {month}: {item ? statuses[item.status] : 'Chưa nhập — thiếu dữ liệu'}</strong>
-                  {item?.status === 'collected' && <span>{['ratio', 'rate'].includes(indicator.method) ? `${item.numerator}/${item.denominator}` : `${item.value}${selectedCriterion && isSingleValuePercentage(selectedCriterion) ? '%' : ''}`}</span>}
-                  {item?.note && <span>{item.note}</span>}
-                  {item?.evidenceUrl && /^https?:\/\/\S+$/i.test(item.evidenceUrl) && <a href={item.evidenceUrl} target="_blank" rel="noopener noreferrer">Xem minh chứng</a>}
-                </div>
-              })}
+              {period === 'year'
+                ? [1, 2, 3, 4].map(quarter => {
+                    const quarterPeriod = `quarter${quarter}`
+                    return <div key={quarter} className="score-item">
+                      <strong>Quý {quarter}: {formatSummary(summarizePeriod(records, quarterPeriod, indicator), indicator.method, selectedCriterion)}</strong>
+                    </div>
+                  })
+                : months.map(month => {
+                    const item = records.find(record => Number(record.month) === month)
+                    return <div key={month} className="score-item">
+                      <strong>Tháng {month}: {item ? statuses[item.status] : 'Chưa nhập — thiếu dữ liệu'}</strong>
+                      {item?.status === 'collected' && <span>{['ratio', 'rate'].includes(indicator.method) ? `${item.numerator}/${item.denominator}` : `${item.value}${selectedCriterion && isSingleValuePercentage(selectedCriterion) ? '%' : ''}`}</span>}
+                      {item?.note && <span>{item.note}</span>}
+                      {item?.evidenceUrl && /^https?:\/\/\S+$/i.test(item.evidenceUrl) && <a href={item.evidenceUrl} target="_blank" rel="noopener noreferrer">Xem minh chứng</a>}
+                    </div>
+                  })}
             </div>
           </div>}
           {validYear && <MonthlyForm unitId={unitId} indicator={indicator} criterion={selectedCriterion} year={year} records={records} mayEdit={mayEdit} />}

@@ -2,7 +2,6 @@ import './Navigation.css'
 
 export default function Navigation({ currentPage, setCurrentPage }) {
   const navItems = [
-    { id: 'home', label: 'Trang chủ', icon: '🏠' },
     { id: 'system', label: 'Hệ thống đánh giá', icon: '📊' },
     { id: 'timeline', label: 'Lịch trình', icon: '📅' },
     { id: 'data', label: 'Dữ liệu đánh giá', icon: '📋' },

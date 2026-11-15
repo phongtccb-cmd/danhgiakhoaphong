@@ -559,16 +559,7 @@ export default function SharedData() {
             </div>
           </div>
         )}
-        {!dataLoading && !error && !selectedUnit && <section aria-labelledby="unit-groups-heading">
-          <div className="shared-card">
-            <h3 id="unit-groups-heading">Danh sách theo 3 nhóm</h3>
-            <p>{data.units.length}/49 đơn vị có trong danh mục. Chọn khoa/phòng để xem tiêu chí và cập nhật số liệu tháng.</p>
-            <div className="criteria-domain-summary">
-              {criterionDomains.map(domain => <div className="score-item" key={domain.key}>
-                <strong>{domain.name}</strong><span>Trọng số đề xuất: {domain.weight}%</span>
-              </div>)}
-            </div>
-          </div>
+        {!dataLoading && !error && !selectedUnit && <section>
           {criterionGroups.map(group => {
             const units = data.units.filter(unit => unit.group === group.key).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
             const target = group.key === 'functional' ? 11 : group.key === 'clinical' ? 31 : 7
