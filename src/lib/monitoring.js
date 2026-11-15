@@ -1,3 +1,25 @@
+export function monthsForPeriod(period) {
+  if (period === 'year') return Array.from({ length: 12 }, (_, index) => index + 1)
+  if (/^quarter[1-4]$/.test(period)) {
+    const quarter = Number(period.slice(-1))
+    return Array.from({ length: 3 }, (_, index) => (quarter - 1) * 3 + index + 1)
+  }
+  if (/^month(0[1-9]|1[0-2])$/.test(period)) return [Number(period.slice(5))]
+  throw new Error('Kỳ theo dõi không hợp lệ.')
+}
+
+export function summarizeIndicator(records, months, indicator) {
+  const monthRecords = records.map(record => ({ ...record, month: Number(record.month) }))
+  return summarizeMonths(monthRecords, months, indicator.method, indicator.allowNegative)
+}
+
+export function countAvailableSummaries(indicators, records, months) {
+  return indicators.reduce((count, indicator) => {
+    const matching = records.filter(record => record.indicatorId === indicator.id)
+    return count + (summarizeIndicator(matching, months, indicator).status === 'available' ? 1 : 0)
+  }, 0)
+}
+
 export function summarizeMonths(records, months, method, allowNegative = false) {
   if (!['ratio', 'rate', 'sum', 'last'].includes(method)) return { status: 'invalid' }
   for (const month of months) {
@@ -27,6 +49,7 @@ export function summarizeMonths(records, months, method, allowNegative = false) 
     return Number.isFinite(value) ? { status: 'available', value, numerator, denominator } : { status: 'invalid' }
   }
   if (method === 'sum') {
+    if (!collected.length) return { status: 'no_occurrence' }
     const value = collected.reduce((sum, item) => sum + item.value, 0)
     return Number.isFinite(value) ? { status: 'available', value } : { status: 'invalid' }
   }

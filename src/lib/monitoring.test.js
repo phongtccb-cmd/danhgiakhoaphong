@@ -1,6 +1,37 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { summarizeMonths } from './monitoring.js'
+import { countAvailableSummaries, monthsForPeriod, summarizeIndicator, summarizeMonths } from './monitoring.js'
+
+test('chọn tháng, quý hoặc năm và từ chối kỳ không hợp lệ', () => {
+  assert.deepEqual(monthsForPeriod('month01'), [1])
+  assert.deepEqual(monthsForPeriod('month11'), [11])
+  assert.deepEqual(monthsForPeriod('month12'), [12])
+  assert.deepEqual(monthsForPeriod('quarter1'), [1, 2, 3])
+  assert.deepEqual(monthsForPeriod('quarter2'), [4, 5, 6])
+  assert.deepEqual(monthsForPeriod('quarter3'), [7, 8, 9])
+  assert.deepEqual(monthsForPeriod('quarter4'), [10, 11, 12])
+  assert.deepEqual(monthsForPeriod('year'), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+  assert.throws(() => monthsForPeriod('month13'), /không hợp lệ/)
+})
+
+test('đếm chỉ tiêu đã có kết quả số liệu theo đúng tháng và trạng thái, không tính là điểm', () => {
+  const indicators = [
+    { id: 'a', method: 'ratio' },
+    { id: 'b', method: 'sum' },
+    { id: 'c', method: 'last' },
+  ]
+  const records = [
+    { indicatorId: 'a', month: '10', status: 'collected', numerator: 9, denominator: 10 },
+    { indicatorId: 'b', month: '10', status: 'no_occurrence' },
+    { indicatorId: 'c', month: '11', status: 'collected', value: 5 },
+  ]
+  assert.equal(countAvailableSummaries(indicators, records, monthsForPeriod('month10')), 1)
+  assert.equal(countAvailableSummaries(indicators, records, monthsForPeriod('month11')), 1)
+  assert.equal(countAvailableSummaries(indicators, records, monthsForPeriod('quarter4')), 0)
+  assert.deepEqual(summarizeIndicator(records.filter(record => record.indicatorId === 'b'), [10], indicators[1]), { status: 'no_occurrence' })
+  assert.equal(countAvailableSummaries(indicators, [...records, { indicatorId: 'a', month: '10', status: 'not_due' }], [10]), 0)
+  assert.equal(countAvailableSummaries(indicators, [{ indicatorId: 'a', month: '10', status: 'collected', numerator: 1, denominator: 0 }], [10]), 0)
+})
 
 test('gộp tử số và mẫu số, không lấy trung bình tỷ lệ tháng', () => {
   const result = summarizeMonths([
