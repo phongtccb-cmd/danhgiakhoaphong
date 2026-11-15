@@ -160,9 +160,9 @@ function UnitImport({ units }) {
       <p>Chỉ thêm đơn vị còn thiếu; không sửa, xóa hoặc thay mã đơn vị đã có. Đối chiếu tên và nhóm trước khi nhập, tránh thao tác nhập danh mục đồng thời ở nơi khác.</p>
       <details>
         <summary>Xem danh sách dự kiến</summary>
-        {Object.entries(groups).map(([group, title]) => <div key={group}>
-          <h4>{title}</h4>
-          <ul>{officialUnits.filter(unit => unit.group === group).map(unit => <li key={unit.id}>{unit.name}</li>)}</ul>
+        {criterionGroups.map(group => <div key={group.key}>
+          <h4>{group.name}</h4>
+          <ul>{officialUnits.filter(unit => unit.group === group.key).map(unit => <li key={unit.id}>{unit.name}</li>)}</ul>
         </div>)}
       </details>
       {preview.errors.length > 0 ? <div className="shared-error" role="alert">
@@ -400,7 +400,7 @@ function MonthlyCriterion({ criterion, record, unitId, year, month, mayEdit }) {
     if (status === 'collected' && (criterion.method === 'ratio' || criterion.method === 'rate'
       ? !Number.isFinite(numeratorValue) || numeratorValue < 0 || !Number.isFinite(denominatorValue) || denominatorValue <= 0
       : !Number.isFinite(numericValue))) {
-      setMessage(criterion.method === 'ratio'
+      setMessage(['ratio', 'rate'].includes(criterion.method)
         ? 'Nhập tử số không âm và mẫu số lớn hơn 0.'
         : 'Nhập số liệu dạng số hợp lệ.')
       return
@@ -428,9 +428,9 @@ function MonthlyCriterion({ criterion, record, unitId, year, month, mayEdit }) {
           year,
           month,
           status,
-          numerator: status === 'collected' && criterion.method === 'ratio' ? numeratorValue : null,
-          denominator: status === 'collected' && criterion.method === 'ratio' ? denominatorValue : null,
-          value: status === 'collected' && criterion.method !== 'ratio' ? numericValue : null,
+          numerator: status === 'collected' && ['ratio', 'rate'].includes(criterion.method) ? numeratorValue : null,
+          denominator: status === 'collected' && ['ratio', 'rate'].includes(criterion.method) ? denominatorValue : null,
+          value: status === 'collected' && !['ratio', 'rate'].includes(criterion.method) ? numericValue : null,
           evidenceUrl: evidenceUrl.trim(),
           note: note.trim(),
           updatedAt: serverTimestamp(),
